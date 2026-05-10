@@ -89,6 +89,34 @@ public class VikingRepository {
         return key.intValue();
     }
 
+    /**
+     * Обновляет существующего викинга. Возвращает количество затронутых строк
+     * (0 — если викинга с таким id нет).
+     */
+    public int update(int id, VikingEntity viking) {
+        String sql = """
+                update vikings
+                set name = ?,
+                    age = ?,
+                    height_cm = ?,
+                    hair_color = ?,
+                    beard_style = ?,
+                    description = ?
+                where id = ?
+                """;
+
+        return jdbcTemplate.update(
+                sql,
+                viking.name(),
+                viking.age(),
+                viking.heightCm(),
+                viking.hairColor().name(),
+                viking.beardStyle().name(),
+                viking.description(),
+                id
+        );
+    }
+
     public void deleteById(int id) {
         String sql = "delete from vikings where id = ?";
         jdbcTemplate.update(sql, id);

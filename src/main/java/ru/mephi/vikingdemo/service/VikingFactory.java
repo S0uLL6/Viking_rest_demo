@@ -18,7 +18,9 @@ public class VikingFactory {
     private final Random random = new Random();
 
     public Viking createRandomViking() {
+        // id = null — реальный id присвоит БД при сохранении
         return new Viking(
+                null,
                 faker.name().firstName(),
                 18 + random.nextInt(43),
                 160 + random.nextInt(41),

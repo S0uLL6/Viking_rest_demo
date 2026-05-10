@@ -2,6 +2,7 @@ package ru.mephi.vikingdemo.repository;
 
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,13 +35,66 @@ public class VikingStorage {
                 vikingMapper.toVikingEntity(viking)
         );
 
-        for (EquipmentItem item : viking.equipment()) {
+        List<EquipmentItem> equipment = viking.equipment() != null
+                ? viking.equipment()
+                : List.of();
+
+        for (EquipmentItem item : equipment) {
             equipmentItemRepository.save(
                     vikingMapper.toEquipmentItemEntity(vikingId, item)
             );
         }
 
-        return viking;
+        // возвращаем викинга с проставленным id, чтобы клиент знал, что вставилось
+        return new Viking(
+                vikingId,
+                viking.name(),
+                viking.age(),
+                viking.heightCm(),
+                viking.hairColor(),
+                viking.beardStyle(),
+                equipment
+        );
+    }
+
+    /**
+     * Полная перезапись викинга по id: обновляем поля, удаляем все его equipment_items
+     * и вставляем заново. Возвращает обновлённого викинга.
+     *
+     * @throws NoSuchElementException если викинга с таким id нет
+     */
+    @Transactional
+    public Viking update(int id, Viking viking) {
+        int rowsAffected = vikingRepository.update(
+                id,
+                vikingMapper.toVikingEntity(viking)
+        );
+
+        if (rowsAffected == 0) {
+            throw new NoSuchElementException("Викинг с id=" + id + " не найден");
+        }
+
+        equipmentItemRepository.deleteByVikingId(id);
+
+        List<EquipmentItem> equipment = viking.equipment() != null
+                ? viking.equipment()
+                : List.of();
+
+        for (EquipmentItem item : equipment) {
+            equipmentItemRepository.save(
+                    vikingMapper.toEquipmentItemEntity(id, item)
+            );
+        }
+
+        return new Viking(
+                id,
+                viking.name(),
+                viking.age(),
+                viking.heightCm(),
+                viking.hairColor(),
+                viking.beardStyle(),
+                equipment
+        );
     }
 
     public List<Viking> findAll() {
@@ -60,6 +114,7 @@ public class VikingStorage {
 
     @Transactional
     public void deleteById(int id) {
+        // equipment_items удалятся каскадом (FK с on delete cascade)
         vikingRepository.deleteById(id);
     }
 }
