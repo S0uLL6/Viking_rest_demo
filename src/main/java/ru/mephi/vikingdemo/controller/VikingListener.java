@@ -30,4 +30,11 @@ public class VikingListener {
     void testAdd() {
         gui.addNewViking(service.createRandomViking());
     }
+
+    /** Обновляет таблицу в GUI после REST-операций. */
+    public void refresh() {
+        if (gui != null) {
+            gui.refreshFromDb();
+        }
+    }
 }

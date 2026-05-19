@@ -79,6 +79,7 @@ public class VikingController {
     public ResponseEntity<Viking> createViking(@RequestBody Viking viking) {
         System.out.println("POST /api/vikings called with body: " + viking);
         Viking created = vikingService.create(viking);
+        vikingListener.refresh();   // обновить таблицу в GUI
         URI location = URI.create("/api/vikings/" + created.id());
         return ResponseEntity.created(location).body(created);
     }
@@ -92,6 +93,7 @@ public class VikingController {
     public ResponseEntity<Void> deleteViking(@PathVariable int id) {
         System.out.println("DELETE /api/vikings/" + id + " called");
         vikingService.deleteById(id);
+        vikingListener.refresh();   // обновить таблицу в GUI
         return ResponseEntity.noContent().build();
     }
 
@@ -105,7 +107,9 @@ public class VikingController {
     public Viking updateViking(@PathVariable int id, @RequestBody Viking viking) {
         System.out.println("PUT /api/vikings/" + id + " called with body: " + viking);
         try {
-            return vikingService.update(id, viking);
+            Viking updated = vikingService.update(id, viking);
+            vikingListener.refresh();   // обновить таблицу в GUI
+            return updated;
         } catch (NoSuchElementException e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         }

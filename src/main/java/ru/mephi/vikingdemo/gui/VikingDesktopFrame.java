@@ -10,6 +10,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -55,6 +56,19 @@ public class VikingDesktopFrame extends JFrame {
     
     public void addNewViking(Viking viking){
         tableModel.addViking(viking);
+    }
+
+    /** Перечитать всех викингов из БД и перерисовать таблицу.
+     *  Вызывается из VikingListener после операций POST/PUT/DELETE через REST. */
+    public void refreshFromDb() {
+        // Гарантируем что обновление JTable идёт в EDT (Swing-потоке),
+        // даже если refresh вызван из не-Swing потока (Tomcat worker).
+        SwingUtilities.invokeLater(() -> {
+            tableModel.clear();
+            for (Viking viking : vikingService.findAll()) {
+                tableModel.addViking(viking);
+            }
+        });
     }
 
     private void onInit() {
