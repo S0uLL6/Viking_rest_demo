@@ -1,6 +1,7 @@
 package ru.mephi.vikingdemo.gui;
 
 import ru.mephi.vikingdemo.model.Viking;
+import ru.mephi.vikingdemo.service.VikingLambdaService;
 import ru.mephi.vikingdemo.service.VikingService;
 
 import javax.swing.JButton;
@@ -19,10 +20,15 @@ import java.util.List;
 public class VikingDesktopFrame extends JFrame {
 
     private final VikingService vikingService;
+    private final VikingLambdaService lambdaService;
     private final VikingTableModel tableModel = new VikingTableModel();
 
-    public VikingDesktopFrame(VikingService vikingService) {
+    /** Создаётся лениво при первом нажатии кнопки. */
+    private VikingLambdaFrame lambdaFrame;
+
+    public VikingDesktopFrame(VikingService vikingService, VikingLambdaService lambdaService) {
         this.vikingService = vikingService;
+        this.lambdaService = lambdaService;
 
         setTitle("Viking Demo");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -41,10 +47,14 @@ public class VikingDesktopFrame extends JFrame {
         JButton createButton = new JButton("Create random viking");
         createButton.addActionListener(event -> onCreateViking());
 
+        JButton lambdaButton = new JButton("Открыть лямбда-сервис");
+        lambdaButton.addActionListener(event -> openLambdaFrame());
+
         JPanel bottomPanel = new JPanel();
         bottomPanel.add(createButton);
+        bottomPanel.add(lambdaButton);
         add(bottomPanel, BorderLayout.SOUTH);
-        
+
         onInit();
     }
 
@@ -52,14 +62,22 @@ public class VikingDesktopFrame extends JFrame {
         Viking viking = vikingService.createRandomViking();
         tableModel.addViking(viking);
     }
-    
-    public void addNewViking(Viking viking){
+
+    public void addNewViking(Viking viking) {
         tableModel.addViking(viking);
+    }
+
+    private void openLambdaFrame() {
+        if (lambdaFrame == null) {
+            lambdaFrame = new VikingLambdaFrame(lambdaService);
+        }
+        lambdaFrame.setVisible(true);
+        lambdaFrame.toFront();
     }
 
     private void onInit() {
         List<Viking> all = vikingService.findAll();
-        if (!all.isEmpty()){
+        if (!all.isEmpty()) {
             for (Viking viking : all) {
                 tableModel.addViking(viking);
             }
