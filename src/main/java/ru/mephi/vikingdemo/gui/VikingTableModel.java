@@ -27,6 +27,33 @@ public class VikingTableModel extends AbstractTableModel {
         }
     }
 
+    /** Удаляет строку с викингом, у которого данный id. */
+    public void removeByVikingId(int id) {
+        for (int i = 0; i < data.size(); i++) {
+            Viking v = data.get(i);
+            if (v.id() != null && v.id() == id) {
+                data.remove(i);
+                fireTableRowsDeleted(i, i);
+                return;
+            }
+        }
+    }
+
+    /** Заменяет викинга в таблице (находит по id и подставляет новый объект). */
+    public void replaceViking(Viking viking) {
+        if (viking.id() == null) {
+            return;
+        }
+        for (int i = 0; i < data.size(); i++) {
+            Viking v = data.get(i);
+            if (v.id() != null && v.id().equals(viking.id())) {
+                data.set(i, viking);
+                fireTableRowsUpdated(i, i);
+                return;
+            }
+        }
+    }
+
     @Override
     public int getRowCount() {
         return data.size();

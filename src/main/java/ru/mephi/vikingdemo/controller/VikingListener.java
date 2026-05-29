@@ -7,7 +7,10 @@ package ru.mephi.vikingdemo.controller;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import ru.mephi.vikingdemo.gui.VikingDesktopFrame;
+import ru.mephi.vikingdemo.model.Viking;
 import ru.mephi.vikingdemo.service.VikingService;
+
+import javax.swing.SwingUtilities;
 
 /**
  *
@@ -22,7 +25,7 @@ public class VikingListener {
     public VikingListener(VikingService service) {
         this.service = service;
     }
-    
+
     public void setGui(VikingDesktopFrame gui){
         this.gui = gui;
     }
@@ -31,10 +34,24 @@ public class VikingListener {
         gui.addNewViking(service.createRandomViking());
     }
 
-    /** Обновляет таблицу в GUI после REST-операций. */
-    public void refresh() {
+    /** REST-операция POST успешна — добавляем новую строку в таблицу. */
+    public void onCreated(Viking viking) {
         if (gui != null) {
-            gui.refreshFromDb();
+            SwingUtilities.invokeLater(() -> gui.addNewViking(viking));
+        }
+    }
+
+    /** REST-операция DELETE успешна — удаляем конкретную строку по id. */
+    public void onDeleted(int id) {
+        if (gui != null) {
+            SwingUtilities.invokeLater(() -> gui.removeViking(id));
+        }
+    }
+
+    /** REST-операция PUT успешна — заменяем строку с этим id новыми данными. */
+    public void onUpdated(Viking viking) {
+        if (gui != null) {
+            SwingUtilities.invokeLater(() -> gui.replaceViking(viking));
         }
     }
 }
