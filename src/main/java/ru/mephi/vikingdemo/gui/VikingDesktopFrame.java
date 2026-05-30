@@ -44,23 +44,25 @@ public class VikingDesktopFrame extends JFrame {
         vikingTable.setRowHeight(28);
         add(new JScrollPane(vikingTable), BorderLayout.CENTER);
 
-        JButton createButton = new JButton("Create random viking");
-        createButton.addActionListener(event -> onCreateViking());
+        JButton create50Button = new JButton("Create 50 vikings");
+        create50Button.addActionListener(event -> onCreate50Vikings());
 
         JButton lambdaButton = new JButton("Открыть лямбда-сервис");
         lambdaButton.addActionListener(event -> openLambdaFrame());
 
         JPanel bottomPanel = new JPanel();
-        bottomPanel.add(createButton);
+        bottomPanel.add(create50Button);
         bottomPanel.add(lambdaButton);
         add(bottomPanel, BorderLayout.SOUTH);
 
         onInit();
     }
 
-    private void onCreateViking() {
-        Viking viking = vikingService.createRandomViking();
-        tableModel.addViking(viking);
+    private void onCreate50Vikings() {
+        for (int i = 0; i < 50; i++) {
+            Viking viking = vikingService.createRandomViking();
+            tableModel.addViking(viking);
+        }
     }
 
     public void addNewViking(Viking viking) {
