@@ -1,6 +1,7 @@
 package ru.mephi.vikingdemo.service;
 
 import org.springframework.stereotype.Service;
+import ru.mephi.vikingdemo.model.BeardColor;
 import ru.mephi.vikingdemo.model.BeardStyle;
 import ru.mephi.vikingdemo.model.HairColor;
 import ru.mephi.vikingdemo.model.Viking;
@@ -118,12 +119,12 @@ public class VikingLambdaService {
     }
 
     /**
-     * «Рыжебородые» — в модели нет цвета бороды, поэтому интерпретируем
-     * как викингов с рыжими волосами (HairColor.Red), отсортированных по возрасту.
+     * Рыжебородые викинги — фильтрация по {@link BeardColor#Red},
+     * отсортированные по возрасту.
      */
-    public List<Viking> redHairSortedByAge() {
+    public List<Viking> redBeardSortedByAge() {
         return vikingService.findAll().stream()
-                .filter(v -> v.hairColor() == HairColor.Red)
+                .filter(v -> v.beardColor() == BeardColor.Red)
                 .sorted(Comparator.comparingInt(Viking::age))
                 .toList();
     }

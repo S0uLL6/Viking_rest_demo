@@ -7,6 +7,7 @@ public record VikingEntity(
         int heightCm,
         HairColor hairColor,
         BeardStyle beardStyle,
+        BeardColor beardColor,
         String description
 ) {
 }

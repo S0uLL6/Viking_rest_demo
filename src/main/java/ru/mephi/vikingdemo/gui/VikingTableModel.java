@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
 
 public class VikingTableModel extends AbstractTableModel {
 
-    private final String[] columns = {"Name", "Age", "Height (cm)", "Hair color", "Beard style", "Equipment"};
+    private final String[] columns = {"Name", "Age", "Height (cm)", "Hair color", "Beard style", "Beard color", "Equipment"};
     private final List<Viking> data = new ArrayList<>();
 
     public void addViking(Viking viking) {
@@ -43,7 +43,8 @@ public class VikingTableModel extends AbstractTableModel {
             case 2 -> viking.heightCm();
             case 3 -> viking.hairColor();
             case 4 -> viking.beardStyle();
-            case 5 -> formatEquipment(viking.equipment());
+            case 5 -> viking.beardColor();
+            case 6 -> formatEquipment(viking.equipment());
             default -> "";
         };
     }

@@ -19,6 +19,7 @@ public class VikingMapper {
                 viking.heightCm(),
                 viking.hairColor(),
                 viking.beardStyle(),
+                viking.beardColor(),
                 ""
         );
     }
@@ -50,6 +51,7 @@ public class VikingMapper {
                 entity.heightCm(),
                 entity.hairColor(),
                 entity.beardStyle(),
+                entity.beardColor(),
                 equipment
         );
     }

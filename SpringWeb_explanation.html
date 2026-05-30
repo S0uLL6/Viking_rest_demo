@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Разбор практикума Spring Web — POST/PUT/DELETE для викингов</title>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        max-width: 1100px;
+        margin: 30px auto;
+        padding: 0 20px;
+        color: #1d1d1f;
+        line-height: 1.55;
+    }
+    h1 { font-size: 26px; margin-bottom: 6px; }
+    h2 {
+        font-size: 19px;
+        margin-top: 36px;
+        margin-bottom: 10px;
+        padding-bottom: 6px;
+        border-bottom: 2px solid #d2d2d7;
+    }
+    h3 {
+        font-size: 16px;
+        margin-top: 24px;
+        margin-bottom: 6px;
+        color: #424245;
+    }
+    .lead {
+        color: #515154;
+        font-size: 15px;
+        margin-bottom: 24px;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        font-size: 14px;
+    }
+    th, td {
+        text-align: left;
+        vertical-align: top;
+        padding: 8px 10px;
+        border-bottom: 1px solid #e5e5ea;
+    }
+    th {
+        background: #f5f5f7;
+        font-weight: 600;
+    }
+    td.line {
+        color: #86868b;
+        width: 50px;
+        text-align: right;
+        font-family: "SF Mono", Menlo, monospace;
+        white-space: nowrap;
+    }
+    td.code {
+        font-family: "SF Mono", Menlo, monospace;
+        font-size: 13px;
+        white-space: pre;
+        color: #0b3d91;
+        width: 42%;
+    }
+    td.exp {
+        color: #1d1d1f;
+    }
+    .note {
+        background: #fffbe6;
+        border-left: 3px solid #f5c518;
+        padding: 10px 14px;
+        margin: 16px 0;
+        font-size: 14px;
+        border-radius: 4px;
+    }
+    .key {
+        background: #eef7ee;
+        border-left: 3px solid #34c759;
+        padding: 14px 18px;
+        margin: 20px 0;
+        font-size: 14px;
+        border-radius: 4px;
+    }
+    .diff {
+        background: #fef2f2;
+        border-left: 3px solid #ef4444;
+        padding: 10px 14px;
+        margin: 12px 0;
+        font-size: 14px;
+        border-radius: 4px;
+    }
+    code {
+        font-family: "SF Mono", Menlo, monospace;
+        background: #f5f5f7;
+        padding: 1px 5px;
+        border-radius: 3px;
+        font-size: 0.92em;
+    }
+    ul.files li { margin-bottom: 4px; }
+    .badge {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-right: 6px;
+    }
+    .badge.new { background: #d1fae5; color: #065f46; }
+    .badge.mod { background: #fef3c7; color: #92400e; }
+</style>
+</head>
+<body>
+
+<h1>Практикум Spring Web — построчный разбор изменений</h1>
+<p class="lead">
+    Задание: <b>добавить в REST API три эндпоинта</b> — добавление конкретного викинга (POST),
+    удаление викинга по id (DELETE) и полная перезапись параметров (PUT).
+    В исходном проекте препода был только <code>GET /api/vikings</code> и <code>POST /api/vikings/post</code>
+    (создавал случайного через GUI-листенер). Чтобы появилось три новых эндпоинта,
+    пришлось не только добавить методы в контроллер, но и доработать модель и слои ниже.
+</p>
+
+<h2>Что изменилось — по файлам</h2>
+<ul class="files">
+    <li><span class="badge mod">ИЗМ</span> <code>model/Viking.java</code> — добавлено поле <code>id</code></li>
+    <li><span class="badge mod">ИЗМ</span> <code>repository/VikingMapper.java</code> — маппинг id в обе стороны</li>
+    <li><span class="badge mod">ИЗМ</span> <code>repository/VikingRepository.java</code> — новый метод <code>update(int, VikingEntity)</code></li>
+    <li><span class="badge mod">ИЗМ</span> <code>repository/VikingStorage.java</code> — <code>save</code> теперь возвращает Viking с id, добавлен <code>update</code></li>
+    <li><span class="badge mod">ИЗМ</span> <code>service/VikingService.java</code> — добавлены <code>create</code> и <code>update</code></li>
+    <li><span class="badge mod">ИЗМ</span> <code>controller/VikingController.java</code> — три новых эндпоинта</li>
+    <li><span class="badge mod">ИЗМ</span> <code>service/VikingFactory.java</code> — поправлен под новый конструктор Viking (с id)</li>
+</ul>
+
+<div class="note">
+    <b>Принцип архитектуры:</b> в проекте есть слои <code>Controller → Service → Storage → Repository (JDBC)</code>.
+    Каждый отвечает за своё. Когда добавляем эндпоинт, цепочка тянется сверху вниз: контроллер парсит HTTP, сервис — бизнес-логика,
+    storage — транзакция и согласованность таблиц, repository — конкретные SQL. Не сваливать всё в контроллер — это и есть ООП «по уму».
+</div>
+
+<!-- ============================================================ -->
+<h2>1. <code>model/Viking.java</code> — добавлено поле id</h2>
+
+<div class="diff">
+    <b>Зачем нужно было менять:</b> в оригинале <code>Viking</code> не имел <code>id</code>. GET возвращал список без id —
+    значит клиент не мог сослаться на конкретного викинга при DELETE/PUT (по чему его удалять?).
+    Это был баг исходного API. Добавил <code>id</code> первым полем record-а.
+</div>
+
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">8–22</td>
+        <td class="code">@Schema(description = "Модель викинга")
+public record Viking(
+    @Schema(description = "Идентификатор...")
+    Integer id,
+    @Schema(description = "Имя викинга", example = "Bjorn")
+    String name,
+    ...
+) {}</td>
+        <td class="exp">
+            Record (Java 14+) — это «неизменяемый» класс. Объявил <code>Integer id</code> первым полем (а не <code>int</code>!) — потому что при <b>создании</b> викинга id ещё не известен, его сгенерирует БД, и в это время поле должно быть <code>null</code>. Примитивный <code>int</code> не может быть null.
+            <br><br>
+            Аннотации <code>@Schema</code> — для Swagger: в документации API будут описания и примеры.
+        </td>
+    </tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>2. <code>repository/VikingMapper.java</code> — маппинг id в обе стороны</h2>
+
+<div class="diff">
+    <b>Что было:</b> в <code>toVikingEntity</code> id всегда писался как <code>null</code>; в <code>toViking</code> id вообще пропадал (он не передавался в DTO).<br>
+    <b>Что стало:</b> id честно прокидывается туда и обратно.
+</div>
+
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">15–24</td>
+        <td class="code">public VikingEntity toVikingEntity(Viking viking) {
+    return new VikingEntity(
+        viking.id(),   // ← было: null
+        viking.name(),
+        viking.age(),
+        viking.heightCm(),
+        viking.hairColor(),
+        viking.beardStyle(),
+        ""
+    );
+}</td>
+        <td class="exp">
+            Берём DTO <code>Viking</code> (из REST) и превращаем в <code>VikingEntity</code> (для записи в БД через JDBC). Теперь если у DTO есть id (например при PUT для UPDATE) — он попадёт в Entity. Если id = null (при POST для INSERT) — БД сгенерирует новый.
+        </td>
+    </tr>
+    <tr>
+        <td class="line">42–53</td>
+        <td class="code">public Viking toViking(VikingEntity entity, ...) {
+    ...
+    return new Viking(
+        entity.id(),   // ← добавили
+        entity.name(),
+        entity.age(),
+        entity.heightCm(),
+        entity.hairColor(),
+        entity.beardStyle(),
+        equipment
+    );
+}</td>
+        <td class="exp">
+            Обратное превращение: из Entity (из БД) собираем DTO для REST. Теперь клиент увидит <code>id</code> в JSON-ответе GET-а.
+        </td>
+    </tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>3. <code>repository/VikingRepository.java</code> — метод update</h2>
+
+<p>Это слой, который пишет SQL через <code>JdbcTemplate</code>. Был <code>save</code> (INSERT) и <code>deleteById</code> (DELETE). Не было <code>UPDATE</code> — добавил.</p>
+
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">95–117</td>
+        <td class="code">public int update(int id, VikingEntity viking) {
+    String sql = """
+        update vikings
+        set name = ?,
+            age = ?,
+            height_cm = ?,
+            hair_color = ?,
+            beard_style = ?,
+            description = ?
+        where id = ?
+        """;
+
+    return jdbcTemplate.update(
+        sql,
+        viking.name(), viking.age(), viking.heightCm(),
+        viking.hairColor().name(), viking.beardStyle().name(),
+        viking.description(), id
+    );
+}</td>
+        <td class="exp">
+            Параметризованный SQL — <code>?</code> на месте значений, чтобы не было SQL-инъекции. <code>jdbcTemplate.update</code> подставляет аргументы по порядку.
+            <br><br>
+            <b>Метод возвращает <code>int</code> — количество затронутых строк.</b> Это важно: если викинга с таким id нет, <code>UPDATE</code> просто ничего не сделает и вернёт 0. По этому 0 наверху (в storage) мы понимаем, что нужно бросить «не найден», а не молча врать клиенту «обновил».
+        </td>
+    </tr>
+</table>
+
+<div class="note">
+    <b>Почему <code>hair_color = ?</code> с <code>.name()</code>?</b> В Java это enum, в БД — VARCHAR. <code>.name()</code> у enum возвращает строковое имя константы (<code>"Red"</code>, <code>"BRAIDED"</code> и т.д.).
+</div>
+
+<!-- ============================================================ -->
+<h2>4. <code>repository/VikingStorage.java</code> — save с возвратом id и update</h2>
+
+<p>Storage — это «обёртка» над двумя репозиториями (<code>vikings</code> и <code>equipment_items</code>). Тут согласовываются обе таблицы в одной транзакции.</p>
+
+<h3>save — теперь возвращает Viking с проставленным id</h3>
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">31–58</td>
+        <td class="code">@Transactional
+public Viking save(Viking viking) {
+    Integer vikingId = vikingRepository.save(
+        vikingMapper.toVikingEntity(viking)
+    );
+
+    List&lt;EquipmentItem&gt; equipment =
+        viking.equipment() != null ? viking.equipment() : List.of();
+
+    for (EquipmentItem item : equipment) {
+        equipmentItemRepository.save(
+            vikingMapper.toEquipmentItemEntity(vikingId, item)
+        );
+    }
+
+    return new Viking(
+        vikingId,
+        viking.name(), viking.age(), viking.heightCm(),
+        viking.hairColor(), viking.beardStyle(),
+        equipment
+    );
+}</td>
+        <td class="exp">
+            <ol>
+                <li>Сохраняем строку в <code>vikings</code> — БД генерирует id, возвращаем его в переменную <code>vikingId</code>.</li>
+                <li>Защита от <code>null</code>: если клиент не прислал equipment, обходимся пустым списком вместо NPE.</li>
+                <li>Цикл сохраняет каждый предмет equipment с привязкой к <code>vikingId</code>.</li>
+                <li>В конце возвращаем НОВЫЙ <code>Viking</code> с проставленным id. Это то, что увидит клиент в ответе на POST.</li>
+            </ol>
+            <code>@Transactional</code> — если что-то упадёт между шагами 1 и 3, БД откатится: не останется викинга без снаряжения или наоборот.
+        </td>
+    </tr>
+</table>
+
+<h3>update — полная перезапись (по требованию практикума)</h3>
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">67–101</td>
+        <td class="code">@Transactional
+public Viking update(int id, Viking viking) {
+    int rowsAffected = vikingRepository.update(
+        id, vikingMapper.toVikingEntity(viking)
+    );
+
+    if (rowsAffected == 0) {
+        throw new NoSuchElementException(
+            "Викинг с id=" + id + " не найден");
+    }
+
+    equipmentItemRepository.deleteByVikingId(id);
+
+    List&lt;EquipmentItem&gt; equipment =
+        viking.equipment() != null ? viking.equipment() : List.of();
+
+    for (EquipmentItem item : equipment) {
+        equipmentItemRepository.save(
+            vikingMapper.toEquipmentItemEntity(id, item)
+        );
+    }
+
+    return new Viking(id, viking.name(), ...);
+}</td>
+        <td class="exp">
+            Алгоритм «полной перезаписи»:
+            <ol>
+                <li>UPDATE по таблице <code>vikings</code>. Если 0 строк затронуто — викинга нет, бросаем <code>NoSuchElementException</code>. Это поймает контроллер и превратит в HTTP 404.</li>
+                <li>Удаляем все старые equipment_items этого викинга.</li>
+                <li>Вставляем новые equipment_items из тела PUT-запроса.</li>
+                <li>Возвращаем обновлённого Viking с тем же id.</li>
+            </ol>
+            <b>Почему так:</b> PUT по REST-семантике = «полная замена ресурса». Не PATCH (частичная правка). Поэтому equipment удаляем и вставляем заново — как сказал препод, «перезапись».
+            <br><br>
+            Всё в одной транзакции — если на шаге 3 что-то упадёт, equipment не останется потерянным.
+        </td>
+    </tr>
+</table>
+
+<h3>deleteById — упростился благодаря FK</h3>
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">120–124</td>
+        <td class="code">@Transactional
+public void deleteById(int id) {
+    // equipment_items удалятся каскадом (FK on delete cascade)
+    vikingRepository.deleteById(id);
+}</td>
+        <td class="exp">
+            В <code>schema.sql</code> у <code>equipment_items.viking_id</code> стоит <code>foreign key ... on delete cascade</code>. Это значит: когда удаляем строку из <code>vikings</code>, БД сама удалит все связанные строки из <code>equipment_items</code>. Нам в коде ничего дополнительно делать не нужно.
+        </td>
+    </tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>5. <code>service/VikingService.java</code> — обёртки для create/update</h2>
+
+<p>Сервисный слой просто пробрасывает вызовы в storage. Бизнес-логики (валидаций, нотификаций и т.п.) у нас здесь нет.</p>
+
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">35–37</td>
+        <td class="code">public Viking create(Viking viking) {
+    return vikingStorage.save(viking);
+}</td>
+        <td class="exp">Обёртка для POST. Возвращает Viking с присвоенным id (см. <code>VikingStorage.save</code>).</td>
+    </tr>
+    <tr>
+        <td class="line">42–44</td>
+        <td class="code">public Viking update(int id, Viking viking) {
+    return vikingStorage.update(id, viking);
+}</td>
+        <td class="exp">Обёртка для PUT. Может бросить <code>NoSuchElementException</code> (из storage) — это поймает контроллер.</td>
+    </tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>6. <code>controller/VikingController.java</code> — три новых эндпоинта</h2>
+
+<p>Это <b>сердце практикума</b>. Контроллер принимает HTTP-запросы и отдаёт HTTP-ответы.</p>
+
+<h3>POST /api/vikings — добавить конкретного викинга</h3>
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">73</td>
+        <td class="code">@PostMapping</td>
+        <td class="exp">Без пути в скобках = на корень класса (<code>/api/vikings</code>). Старый <code>@PostMapping("/post")</code> не конфликтует, потому что у него другой путь.</td>
+    </tr>
+    <tr>
+        <td class="line">74–78</td>
+        <td class="code">@Operation(summary = "Добавить конкретного викинга", ...)
+@ApiResponses({ @ApiResponse(responseCode = "201", ...) })</td>
+        <td class="exp">Аннотации Swagger — описание метода в документации. Не влияют на работу, только на отображение.</td>
+    </tr>
+    <tr>
+        <td class="line">79</td>
+        <td class="code">public ResponseEntity&lt;Viking&gt; createViking(@RequestBody Viking viking)</td>
+        <td class="exp">
+            <code>@RequestBody</code> — Spring достанет JSON из тела запроса и десериализует в объект <code>Viking</code> (через Jackson).<br>
+            <code>ResponseEntity&lt;Viking&gt;</code> — мы хотим сами контролировать HTTP-код ответа (не дефолтный 200, а 201 Created).
+        </td>
+    </tr>
+    <tr>
+        <td class="line">80–83</td>
+        <td class="code">Viking created = vikingService.create(viking);
+URI location = URI.create("/api/vikings/" + created.id());
+return ResponseEntity.created(location).body(created);</td>
+        <td class="exp">
+            <ol>
+                <li>Сохраняем — получаем тот же объект, но с проставленным id.</li>
+                <li>Формируем URL нового ресурса.</li>
+                <li>Возвращаем <b>HTTP 201 Created</b> + заголовок <code>Location: /api/vikings/4</code> + тело с самим Viking. Это «правильный» REST-ответ на POST.</li>
+            </ol>
+        </td>
+    </tr>
+</table>
+
+<h3>DELETE /api/vikings/{id} — удалить викинга</h3>
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">86</td>
+        <td class="code">@DeleteMapping("/{id}")</td>
+        <td class="exp">Маппинг на <code>DELETE /api/vikings/{что-то}</code>. <code>{id}</code> — путевой параметр.</td>
+    </tr>
+    <tr>
+        <td class="line">92</td>
+        <td class="code">public ResponseEntity&lt;Void&gt; deleteViking(@PathVariable int id)</td>
+        <td class="exp">
+            <code>@PathVariable</code> — Spring подставит сюда значение из URL. Если запрос <code>DELETE /api/vikings/5</code>, то <code>id = 5</code>.<br>
+            <code>ResponseEntity&lt;Void&gt;</code> — потому что мы вернём 204 без тела.
+        </td>
+    </tr>
+    <tr>
+        <td class="line">93–95</td>
+        <td class="code">vikingService.deleteById(id);
+return ResponseEntity.noContent().build();</td>
+        <td class="exp">
+            Удаляем (если викинга нет — БД молча ничего не сделает). Возвращаем <b>HTTP 204 No Content</b> — стандарт для успешного DELETE без тела ответа.
+        </td>
+    </tr>
+</table>
+
+<div class="note">
+    <b>Почему DELETE не возвращает 404, если викинга нет?</b><br>
+    REST допускает оба варианта. Я выбрал «всегда 204», потому что <b>идемпотентность</b>: повторный DELETE того же id должен давать тот же результат. Если первый раз вернёт 204, а второй раз 404 — это нарушает идемпотентность. Препод спросит — отвечай так.
+</div>
+
+<h3>PUT /api/vikings/{id} — полностью перезаписать викинга</h3>
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">98</td>
+        <td class="code">@PutMapping("/{id}")</td>
+        <td class="exp">Маппинг на <code>PUT /api/vikings/{id}</code>.</td>
+    </tr>
+    <tr>
+        <td class="line">105</td>
+        <td class="code">public Viking updateViking(
+    @PathVariable int id,
+    @RequestBody Viking viking)</td>
+        <td class="exp">
+            Два источника данных: <code>id</code> — из URL, тело — из JSON. Spring разберёт оба автоматически.<br>
+            Возвращаем напрямую <code>Viking</code> (не ResponseEntity) — потому что код ответа по умолчанию 200 OK, нас устраивает.
+        </td>
+    </tr>
+    <tr>
+        <td class="line">107–111</td>
+        <td class="code">try {
+    return vikingService.update(id, viking);
+} catch (NoSuchElementException e) {
+    throw new ResponseStatusException(
+        HttpStatus.NOT_FOUND, e.getMessage());
+}</td>
+        <td class="exp">
+            Ловим <code>NoSuchElementException</code> из service (он был брошен в storage, если викинг не найден). Преобразуем в <code>ResponseStatusException</code> с кодом <b>HTTP 404 Not Found</b> — Spring сам отправит правильный ответ.
+            <br><br>
+            <b>Почему не создаём новый при PUT?</b> По REST-семантике PUT может «создать или обновить», но в нашей системе id генерирует БД, и клиент не должен сам присваивать id. Поэтому если id нет — это ошибка клиента (404), а не команда «создай заново».
+        </td>
+    </tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>7. <code>service/VikingFactory.java</code> — побочное изменение</h2>
+
+<div class="diff">
+    <b>Почему пришлось трогать:</b> добавив <code>id</code> в Viking, я сломал старую сигнатуру конструктора. <code>VikingFactory</code> создавал викинга через <code>new Viking(name, age, ...)</code> — теперь обязательно нужно передать id первым параметром.
+</div>
+
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">21–30</td>
+        <td class="code">public Viking createRandomViking() {
+    // id = null — реальный id присвоит БД при сохранении
+    return new Viking(
+        null,    // ← добавили
+        faker.name().firstName(),
+        18 + random.nextInt(43),
+        160 + random.nextInt(41),
+        HairColor.values()[...],
+        BeardStyle.values()[...],
+        createRandomEquipment()
+    );
+}</td>
+        <td class="exp">
+            При генерации случайного викинга id не знаем — пишем <code>null</code>. После того, как этот объект пройдёт через <code>VikingStorage.save</code>, оттуда вернётся уже с id из БД.
+        </td>
+    </tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>8. Обновление GUI после REST-операций</h2>
+
+<div class="diff">
+    <b>Проблема:</b> REST-эндпоинты пишут данные в БД, но <code>JTable</code> в Swing-окне об этом не знает —
+    таблица показывает старые данные до перезапуска. Препод спросил «а где обновление GUI?» — пришлось дорабатывать.
+</div>
+
+<p>
+    <b>Решение:</b> после каждой REST-операции контроллер вызывает соответствующий метод листенера,
+    который точечно обновляет одну строку таблицы. Никакой перерисовки всего списка.
+</p>
+
+<h3>Цепочка вызовов</h3>
+<table>
+    <tr><th>Шаг</th><th>Где</th><th>Что делает</th></tr>
+    <tr>
+        <td>1</td>
+        <td><code>VikingController</code></td>
+        <td>После операции с БД вызывает <code>vikingListener.onCreated(viking)</code> / <code>onDeleted(id)</code> / <code>onUpdated(viking)</code></td>
+    </tr>
+    <tr>
+        <td>2</td>
+        <td><code>VikingListener</code></td>
+        <td>Оборачивает действие в <code>SwingUtilities.invokeLater(...)</code> — перевод в поток EDT</td>
+    </tr>
+    <tr>
+        <td>3</td>
+        <td><code>VikingDesktopFrame</code></td>
+        <td>Вызывает соответствующий метод <code>tableModel</code>: <code>addViking</code> / <code>removeByVikingId</code> / <code>replaceViking</code></td>
+    </tr>
+    <tr>
+        <td>4</td>
+        <td><code>VikingTableModel</code></td>
+        <td>Меняет внутренний список <code>data</code> и оповещает таблицу через <code>fireTableRowsInserted/Deleted/Updated</code></td>
+    </tr>
+    <tr>
+        <td>5</td>
+        <td>JTable</td>
+        <td>Получает уведомление и перерисовывает ТОЛЬКО изменившуюся строку</td>
+    </tr>
+</table>
+
+<h3>Фрагменты кода по шагам (на примере POST)</h3>
+
+<div style="background:#f5f5f7;border-left:3px solid #0b3d91;border-radius:4px;padding:10px 14px;margin:14px 0">
+    <div style="font-weight:600;font-size:14px;margin-bottom:6px">Шаг 1 · <code>VikingController.java</code></div>
+    <pre style="background:#fff;border:1px solid #d2d2d7;border-radius:4px;padding:10px 12px;font-family:'SF Mono',Menlo,monospace;font-size:13px;line-height:1.5;margin:0;overflow-x:auto">@PostMapping
+public ResponseEntity&lt;Viking&gt; createViking(@RequestBody Viking viking) {
+    Viking created = vikingService.create(viking);   <span style="color:#86868b">// сохранили в БД, получили объект с id</span>
+    <b style="background:#fff3a8">vikingListener.onCreated(created);</b>                <span style="color:#86868b">// → шаг 2</span>
+    URI location = URI.create("/api/vikings/" + created.id());
+    return ResponseEntity.created(location).body(created);
+}</pre>
+</div>
+
+<div style="background:#f5f5f7;border-left:3px solid #0b3d91;border-radius:4px;padding:10px 14px;margin:14px 0">
+    <div style="font-weight:600;font-size:14px;margin-bottom:6px">Шаг 2 · <code>VikingListener.java</code></div>
+    <pre style="background:#fff;border:1px solid #d2d2d7;border-radius:4px;padding:10px 12px;font-family:'SF Mono',Menlo,monospace;font-size:13px;line-height:1.5;margin:0;overflow-x:auto">public void onCreated(Viking viking) {
+    if (gui != null) {
+        <b style="background:#fff3a8">SwingUtilities.invokeLater(() -&gt; gui.addNewViking(viking));</b>
+    }
+}</pre>
+    <div style="font-size:13px;color:#515154;margin-top:6px">Тут происходит переход из потока Tomcat в EDT — invokeLater ставит лямбду в очередь Swing.</div>
+</div>
+
+<div style="background:#f5f5f7;border-left:3px solid #0b3d91;border-radius:4px;padding:10px 14px;margin:14px 0">
+    <div style="font-weight:600;font-size:14px;margin-bottom:6px">Шаг 3 · <code>VikingDesktopFrame.java</code></div>
+    <pre style="background:#fff;border:1px solid #d2d2d7;border-radius:4px;padding:10px 12px;font-family:'SF Mono',Menlo,monospace;font-size:13px;line-height:1.5;margin:0;overflow-x:auto">public void addNewViking(Viking viking) {
+    <b style="background:#fff3a8">tableModel.addViking(viking);</b>   <span style="color:#86868b">// → шаг 4</span>
+}</pre>
+    <div style="font-size:13px;color:#515154;margin-top:6px">Frame ничего не решает сам — просто проброс в модель.</div>
+</div>
+
+<div style="background:#f5f5f7;border-left:3px solid #0b3d91;border-radius:4px;padding:10px 14px;margin:14px 0">
+    <div style="font-weight:600;font-size:14px;margin-bottom:6px">Шаг 4 · <code>VikingTableModel.java</code></div>
+    <pre style="background:#fff;border:1px solid #d2d2d7;border-radius:4px;padding:10px 12px;font-family:'SF Mono',Menlo,monospace;font-size:13px;line-height:1.5;margin:0;overflow-x:auto">public void addViking(Viking viking) {
+    int row = data.size();
+    data.add(viking);                       <span style="color:#86868b">// добавили в список</span>
+    <b style="background:#fff3a8">fireTableRowsInserted(row, row);</b>        <span style="color:#86868b">// → JTable: «вставлена строка row»</span>
+}</pre>
+</div>
+
+<div style="background:#f5f5f7;border-left:3px solid #0b3d91;border-radius:4px;padding:10px 14px;margin:14px 0">
+    <div style="font-weight:600;font-size:14px;margin-bottom:6px">Шаг 5 · JTable (встроенный механизм Swing)</div>
+    <div style="font-size:13.5px;color:#1d1d1f;padding:6px 0">
+        Кода тут нет — это код самого Swing. JTable слушает события модели. Метод <code>fireTableRowsInserted</code> вызывает <code>tableChanged</code> у JTable, она запрашивает значения только для новой строки через <code>getValueAt(row, col)</code> и рисует. Остальные строки не трогаются.
+    </div>
+</div>
+
+<h3>Аналогично для DELETE и PUT — меняются только методы</h3>
+
+<table>
+    <tr><th>Шаг</th><th>POST</th><th>DELETE</th><th>PUT</th></tr>
+    <tr>
+        <td>1 (Controller)</td>
+        <td><code>vikingListener.onCreated(created)</code></td>
+        <td><code>vikingListener.onDeleted(id)</code></td>
+        <td><code>vikingListener.onUpdated(updated)</code></td>
+    </tr>
+    <tr>
+        <td>2 (Listener)</td>
+        <td><code>gui.addNewViking(viking)</code></td>
+        <td><code>gui.removeViking(id)</code></td>
+        <td><code>gui.replaceViking(viking)</code></td>
+    </tr>
+    <tr>
+        <td>3 (Frame)</td>
+        <td><code>tableModel.addViking(viking)</code></td>
+        <td><code>tableModel.removeByVikingId(id)</code></td>
+        <td><code>tableModel.replaceViking(viking)</code></td>
+    </tr>
+    <tr>
+        <td>4 (TableModel)</td>
+        <td><code>fireTableRowsInserted(row, row)</code></td>
+        <td><code>fireTableRowsDeleted(i, i)</code></td>
+        <td><code>fireTableRowsUpdated(i, i)</code></td>
+    </tr>
+</table>
+
+<h3>Что делают конкретные методы</h3>
+
+<table>
+    <tr><th>Операция</th><th>Метод листенера</th><th>Что происходит с таблицей</th></tr>
+    <tr>
+        <td><b>POST</b></td>
+        <td><code>onCreated(Viking v)</code></td>
+        <td><code>tableModel.addViking(v)</code> — добавляет строку в конец, <code>fireTableRowsInserted</code></td>
+    </tr>
+    <tr>
+        <td><b>DELETE</b></td>
+        <td><code>onDeleted(int id)</code></td>
+        <td><code>tableModel.removeByVikingId(id)</code> — ищет по id, удаляет, <code>fireTableRowsDeleted</code></td>
+    </tr>
+    <tr>
+        <td><b>PUT</b></td>
+        <td><code>onUpdated(Viking v)</code></td>
+        <td><code>tableModel.replaceViking(v)</code> — ищет по id, заменяет объект, <code>fireTableRowsUpdated</code></td>
+    </tr>
+</table>
+
+<h3>Код в <code>VikingListener.java</code></h3>
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">38–42</td>
+        <td class="code">public void onCreated(Viking viking) {
+    if (gui != null) {
+        SwingUtilities.invokeLater(
+            () -&gt; gui.addNewViking(viking));
+    }
+}</td>
+        <td class="exp">Проверяем что GUI уже привязан, и через <code>invokeLater</code> ставим задачу в очередь EDT. Сам gui метод <code>addNewViking</code> просто дёргает <code>tableModel.addViking</code>.</td>
+    </tr>
+    <tr>
+        <td class="line">45–49</td>
+        <td class="code">public void onDeleted(int id) {
+    if (gui != null) {
+        SwingUtilities.invokeLater(
+            () -&gt; gui.removeViking(id));
+    }
+}</td>
+        <td class="exp">Аналогично для удаления — передаём id, frame через tableModel находит и удаляет одну строку.</td>
+    </tr>
+    <tr>
+        <td class="line">52–56</td>
+        <td class="code">public void onUpdated(Viking viking) {
+    if (gui != null) {
+        SwingUtilities.invokeLater(
+            () -&gt; gui.replaceViking(viking));
+    }
+}</td>
+        <td class="exp">Для PUT — передаём обновлённого викинга (с тем же id, новыми полями), frame ищет в таблице по id и заменяет.</td>
+    </tr>
+</table>
+
+<h3>Код в <code>VikingTableModel.java</code> — поиск по id</h3>
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">31–40</td>
+        <td class="code">public void removeByVikingId(int id) {
+    for (int i = 0; i &lt; data.size(); i++) {
+        Viking v = data.get(i);
+        if (v.id() != null &amp;&amp; v.id() == id) {
+            data.remove(i);
+            fireTableRowsDeleted(i, i);
+            return;
+        }
+    }
+}</td>
+        <td class="exp">Пробегаем по списку, находим викинга с нужным id, удаляем из списка и оповещаем JTable что удалилась строка с индексом i. JTable перерисовывает только её.</td>
+    </tr>
+    <tr>
+        <td class="line">43–55</td>
+        <td class="code">public void replaceViking(Viking viking) {
+    if (viking.id() == null) return;
+    for (int i = 0; i &lt; data.size(); i++) {
+        Viking v = data.get(i);
+        if (v.id() != null
+            &amp;&amp; v.id().equals(viking.id())) {
+            data.set(i, viking);
+            fireTableRowsUpdated(i, i);
+            return;
+        }
+    }
+}</td>
+        <td class="exp">То же самое, но с заменой: <code>data.set(i, viking)</code> кладёт новый объект на то же место. <code>fireTableRowsUpdated</code> — JTable перерисует только эту строку, не двигая выделение и прокрутку.</td>
+    </tr>
+</table>
+
+<div class="note">
+    <b>Зачем <code>fireTableRowsXxx</code>?</b>
+    <code>VikingTableModel</code> наследуется от <code>AbstractTableModel</code>. JTable сама не знает что изменилось в данных — она получает оповещение от модели. <code>fireTableRowsInserted/Deleted/Updated</code> и есть это оповещение: «строки с такого по такой индекс добавились/удалились/обновились». Без вызова <code>fire...</code> JTable будет показывать старое.
+</div>
+
+<div class="note">
+    <b>Зачем <code>SwingUtilities.invokeLater</code>?</b>
+    REST-запросы Spring обрабатывает в потоке Tomcat. Swing требует чтобы любые изменения GUI выполнялись в специальном потоке EDT (Event Dispatch Thread). Прямой вызов из Tomcat-потока может вызвать гонки данных и нестабильные баги. <code>invokeLater</code> ставит задачу в очередь EDT — Swing сам её выполнит в безопасном потоке.
+</div>
+
+<div class="key">
+    <b>Сравнение точечного и общего подхода:</b>
+    <table style="margin-top:8px">
+        <tr>
+            <th></th>
+            <th>Общий refresh (был раньше)</th>
+            <th>Точечное обновление (сейчас)</th>
+        </tr>
+        <tr>
+            <td><b>Что делает</b></td>
+            <td>очищает таблицу + читает всю БД + добавляет всех</td>
+            <td>меняет одну строку</td>
+        </tr>
+        <tr>
+            <td><b>Походов в БД</b></td>
+            <td>1 (<code>findAll</code>)</td>
+            <td>0</td>
+        </tr>
+        <tr>
+            <td><b>JTable</b></td>
+            <td>перерисовывает всё</td>
+            <td>только одну строку</td>
+        </tr>
+        <tr>
+            <td><b>Выделение/прокрутка</b></td>
+            <td>сбрасывается</td>
+            <td>сохраняется</td>
+        </tr>
+        <tr>
+            <td><b>Когда лучше</b></td>
+            <td>если кто-то ещё пишет в БД не через наш API</td>
+            <td>штатный сценарий, всё идёт через наш контроллер</td>
+        </tr>
+    </table>
+</div>
+
+<h3>Вопросы препода по этой теме</h3>
+
+<div class="key">
+    <ul>
+        <li><b>Как у тебя обновляется таблица?</b><br>
+        «После REST-операции контроллер вызывает соответствующий метод листенера: <code>onCreated</code>, <code>onDeleted</code> или <code>onUpdated</code>. Листенер через <code>SwingUtilities.invokeLater</code> переводит выполнение в EDT и дёргает метод frame-а. Frame через <code>tableModel</code> точечно меняет одну строку и оповещает JTable через <code>fireTableRowsXxx</code>.»</li>
+
+        <li><b>Почему через VikingListener, а не из контроллера напрямую?</b><br>
+        «Контроллер не должен знать про GUI — он работает только с REST. Листенер специально создан как мост между REST-слоем и Swing-слоем, у него уже была ссылка на главное окно.»</li>
+
+        <li><b>Зачем SwingUtilities.invokeLater?</b><br>
+        «REST приходит в потоке Tomcat, а Swing требует EDT. invokeLater безопасно ставит задачу в очередь EDT.»</li>
+
+        <li><b>Почему точечно, а не общий refresh?</b><br>
+        «Эффективнее: одна правка вместо очистки и перечитки всей БД. Сохраняется состояние UI (выделение, прокрутка). Для большой таблицы это критично, для маленькой — просто чище.»</li>
+
+        <li><b>Что если викинга с таким id нет в таблице (при PUT/DELETE)?</b><br>
+        «Метод ищет в data по id и если не находит — просто возвращается. Это safe-default: значит таблица и БД рассинхронизированы. В нашем сценарии этого не должно случаться, потому что все правки идут через наш контроллер.»</li>
+    </ul>
+</div>
+
+<!-- ============================================================ -->
+<h2>Возможные вопросы препода и ответы</h2>
+
+<div class="key">
+    <h3 style="margin-top:0">Про архитектуру</h3>
+    <ul>
+        <li><b>Зачем нужен Storage между Service и Repository?</b> Чтобы согласовывать две таблицы (<code>vikings</code> и <code>equipment_items</code>) в одной транзакции. <code>VikingRepository</code> и <code>EquipmentItemRepository</code> сами по себе ничего не знают друг о друге.</li>
+        <li><b>Что такое <code>@Transactional</code>?</b> Аннотация Spring, которая оборачивает метод в транзакцию: либо все SQL внутри выполнятся успешно, либо все откатятся. Защищает от частичных записей при ошибках.</li>
+        <li><b>Где валидация входящих данных?</b> Сознательно не делал — препод не требовал. Можно добавить <code>@Valid</code> и аннотации <code>@NotBlank</code>, <code>@Min</code> на полях Viking — это Bean Validation (JSR-380).</li>
+    </ul>
+</div>
+
+<div class="key">
+    <h3 style="margin-top:0">Про HTTP-коды</h3>
+    <ul>
+        <li><b>Почему POST возвращает 201, а не 200?</b> 201 Created — это стандартный код для успешного создания нового ресурса. 200 OK — для просто «всё ок» без указания на создание. Препод любит когда «по уму».</li>
+        <li><b>Почему DELETE 204?</b> 204 No Content — успешно, но в теле ответа нечего возвращать. Это правильный код для DELETE без полезной нагрузки.</li>
+        <li><b>Почему PUT 200, а не 204?</b> Потому что мы возвращаем тело с обновлённым викингом — клиенту полезно видеть «вот что в итоге сохранилось». При пустом теле было бы 204.</li>
+        <li><b>Почему PUT может вернуть 404?</b> Если викинга с таким id нет — обновлять нечего. Это ошибка клиента (он сослался на несуществующий ресурс).</li>
+    </ul>
+</div>
+
+<div class="key">
+    <h3 style="margin-top:0">Про Spring-аннотации</h3>
+    <ul>
+        <li><b><code>@RestController</code> vs <code>@Controller</code>?</b> RestController = Controller + <code>@ResponseBody</code> на всех методах. Возвращаемые объекты автоматически сериализуются в JSON.</li>
+        <li><b>Как работает <code>@RequestBody</code>?</b> Spring читает тело HTTP-запроса (JSON), берёт Jackson и десериализует в указанный Java-тип. Поля сопоставляются по именам.</li>
+        <li><b>Как Spring сопоставляет <code>{id}</code> в пути с <code>@PathVariable int id</code>?</b> По имени — оба называются <code>id</code>. Если бы переменная называлась иначе, нужно было бы писать <code>@PathVariable("id") int vikingId</code>.</li>
+    </ul>
+</div>
+
+<div class="key">
+    <h3 style="margin-top:0">Про PUT vs PATCH</h3>
+    <ul>
+        <li><b>В чём разница?</b> PUT — полная замена ресурса (тело должно содержать весь объект целиком). PATCH — частичное обновление (тело содержит только изменения).</li>
+        <li><b>Почему здесь PUT?</b> Препод просил «перезапись параметров» — это слово соответствует семантике PUT. Если бы было сказано «изменить отдельные поля» — был бы PATCH.</li>
+        <li><b>Что с equipment при PUT?</b> Полная замена: старые equipment_items удаляются, новые из тела вставляются. Если в теле equipment = пустой массив — у викинга вообще не будет снаряжения после обновления. Это и есть «полная перезапись».</li>
+    </ul>
+</div>
+
+</body>
+</html>

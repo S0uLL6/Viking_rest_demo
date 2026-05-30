@@ -201,10 +201,10 @@ public class VikingLambdaFrame extends JFrame {
             list.forEach(v -> log("  - " + format(v)));
         });
 
-        JButton btnRed = new JButton("Рыжеволосые, отсортированные по возрасту");
+        JButton btnRed = new JButton("Рыжебородые, отсортированные по возрасту");
         btnRed.addActionListener(e -> {
-            List<Viking> list = lambdaService.redHairSortedByAge();
-            log("Рыжеволосые по возрасту (" + list.size() + "):");
+            List<Viking> list = lambdaService.redBeardSortedByAge();
+            log("Рыжебородые по возрасту (" + list.size() + "):");
             list.forEach(v -> log("  - " + format(v)));
         });
 
@@ -261,7 +261,8 @@ public class VikingLambdaFrame extends JFrame {
                 .map(it -> it.name() + "[" + it.quality() + "]")
                 .collect(Collectors.joining(", "));
         return v.name() + ", " + v.age() + " лет, рост " + v.heightCm()
-                + " см, " + v.hairColor() + ", борода " + v.beardStyle()
+                + " см, волосы " + v.hairColor()
+                + ", борода " + v.beardStyle() + " (" + v.beardColor() + ")"
                 + ", снаряжение: " + equipment;
     }
 

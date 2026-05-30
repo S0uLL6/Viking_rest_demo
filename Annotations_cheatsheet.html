@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Шпаргалка по аннотациям Spring</title>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        max-width: 1100px;
+        margin: 30px auto;
+        padding: 0 20px;
+        color: #1d1d1f;
+        line-height: 1.55;
+    }
+    h1 { font-size: 26px; margin-bottom: 6px; }
+    h2 {
+        font-size: 19px;
+        margin-top: 36px;
+        margin-bottom: 16px;
+        padding: 8px 12px;
+        background: #f5f5f7;
+        border-left: 4px solid #0b3d91;
+        border-radius: 3px;
+    }
+    .lead {
+        color: #515154;
+        font-size: 15px;
+        margin-bottom: 24px;
+    }
+    .card {
+        border: 1px solid #d2d2d7;
+        border-radius: 8px;
+        padding: 16px 20px;
+        margin-bottom: 16px;
+        background: #fff;
+    }
+    .card h3 {
+        margin: 0 0 8px 0;
+        font-size: 17px;
+        font-family: "SF Mono", Menlo, monospace;
+        color: #0b3d91;
+    }
+    .card .where {
+        color: #86868b;
+        font-size: 13px;
+        margin-bottom: 10px;
+    }
+    .card p { margin: 8px 0; }
+    .card pre {
+        background: #f5f5f7;
+        padding: 10px 12px;
+        border-radius: 4px;
+        font-size: 13px;
+        margin: 8px 0;
+        overflow-x: auto;
+        font-family: "SF Mono", Menlo, monospace;
+        line-height: 1.4;
+    }
+    code {
+        font-family: "SF Mono", Menlo, monospace;
+        background: #f5f5f7;
+        padding: 1px 5px;
+        border-radius: 3px;
+        font-size: 0.92em;
+    }
+    .quick {
+        background: #eef7ee;
+        border-left: 3px solid #34c759;
+        padding: 8px 14px;
+        margin: 8px 0;
+        border-radius: 4px;
+        font-size: 13.5px;
+    }
+    .warn {
+        background: #fffbe6;
+        border-left: 3px solid #f5c518;
+        padding: 8px 14px;
+        margin: 8px 0;
+        border-radius: 4px;
+        font-size: 13.5px;
+    }
+</style>
+</head>
+<body>
+
+<h1>Аннотации в Spring — шпаргалка</h1>
+<p class="lead">
+    Все аннотации, которые встречаются в практикуме Spring Web, по группам.
+    Каждая карточка: что делает, где у тебя в коде, мини-пример. Сверху более частые и важные, ниже — Swagger-аннотации (они только для документации).
+</p>
+
+<!-- =========================================== -->
+<h2>1. Аннотации Spring Web (контроллер и HTTP)</h2>
+
+<div class="card">
+    <h3>@RestController</h3>
+    <div class="where">Стоит на классе <code>VikingController</code> (строка 25).</div>
+    <p>
+        Говорит Spring: «этот класс — обработчик HTTP-запросов, а всё, что возвращают его методы, нужно автоматически превращать в JSON и отправлять в теле ответа».
+    </p>
+    <p>
+        Под капотом это <code>@Controller + @ResponseBody на всех методах</code>. Без него нужно было бы вешать <code>@ResponseBody</code> на каждый метод вручную.
+    </p>
+    <pre>@RestController
+public class VikingController {
+    @GetMapping public List&lt;Viking&gt; getAll() { ... }   // вернётся как JSON
+}</pre>
+    <div class="quick"><b>Когда задают:</b> ответ — «помечает класс как REST-контроллер, ответы автоматически сериализуются в JSON».</div>
+</div>
+
+<div class="card">
+    <h3>@RequestMapping("/api/vikings")</h3>
+    <div class="where">На классе (строка 26).</div>
+    <p>
+        Задаёт <b>общий префикс пути</b> для всех методов внутри класса. К нему добавляется то, что указано в <code>@GetMapping</code>, <code>@PostMapping</code> и т.д.
+    </p>
+    <pre>@RequestMapping("/api/vikings")
+class VikingController {
+    @GetMapping             // → GET  /api/vikings
+    @GetMapping("/test")    // → GET  /api/vikings/test
+    @DeleteMapping("/{id}") // → DELETE /api/vikings/{id}
+}</pre>
+    <div class="quick"><b>В практикуме:</b> все эндпоинты пошли через <code>/api/vikings</code> — это и есть «префикс».</div>
+</div>
+
+<div class="card">
+    <h3>@GetMapping / @PostMapping / @PutMapping / @DeleteMapping</h3>
+    <div class="where">На методах контроллера (строки 38, 49, 60, 73, 86, 98).</div>
+    <p>
+        Сокращённые формы. Каждая привязывает метод к конкретному HTTP-глаголу:
+    </p>
+    <pre>@GetMapping     ≡ @RequestMapping(method = RequestMethod.GET)
+@PostMapping    ≡ @RequestMapping(method = RequestMethod.POST)
+@PutMapping     ≡ @RequestMapping(method = RequestMethod.PUT)
+@DeleteMapping  ≡ @RequestMapping(method = RequestMethod.DELETE)</pre>
+    <p>
+        Без аргумента — путь совпадает с префиксом класса. С аргументом — добавляется к префиксу.
+    </p>
+    <div class="warn"><b>Внимание:</b> если два метода висят на одном URL+глаголе, Spring при старте упадёт с ошибкой «ambiguous mapping».</div>
+</div>
+
+<div class="card">
+    <h3>@PathVariable</h3>
+    <div class="where">В параметрах: <code>deleteViking(@PathVariable int id)</code>, <code>updateViking(@PathVariable int id, ...)</code>.</div>
+    <p>
+        Извлекает значение из <b>пути URL</b> и подставляет в параметр метода. Имена должны совпадать: <code>{id}</code> в маппинге ↔ <code>int id</code> в параметре. Если имена разные — указываем явно: <code>@PathVariable("id") int someId</code>.
+    </p>
+    <pre>@DeleteMapping("/{id}")
+public ResponseEntity&lt;Void&gt; deleteViking(@PathVariable int id) {
+    // если URL = DELETE /api/vikings/5 → id = 5
+}</pre>
+    <div class="warn"><b>Что если прислать /abc?</b> Spring не сможет превратить «abc» в int → отдаст <b>HTTP 400 Bad Request</b> ещё до запуска метода.</div>
+</div>
+
+<div class="card">
+    <h3>@RequestBody</h3>
+    <div class="where">В параметрах: <code>createViking(@RequestBody Viking viking)</code>, <code>updateViking(..., @RequestBody Viking viking)</code>.</div>
+    <p>
+        Берёт <b>тело HTTP-запроса</b> (текст JSON), отдаёт его в Jackson, тот десериализует в указанный Java-тип. Поля JSON сопоставляются с полями record-а/класса по именам.
+    </p>
+    <pre>// HTTP-запрос: POST /api/vikings
+// Body: {"name":"Ragnar","age":40, ...}
+
+@PostMapping
+public ResponseEntity&lt;Viking&gt; createViking(@RequestBody Viking viking) {
+    // viking.name() == "Ragnar", viking.age() == 40
+}</pre>
+    <div class="warn"><b>Что если тело пустое?</b> Spring отдаст <b>HTTP 400</b> (HttpMessageNotReadableException). Если в JSON будет нераспознанное поле — по умолчанию проигнорируется.</div>
+</div>
+
+<!-- =========================================== -->
+<h2>2. Аннотации Spring Core (бины и компоненты)</h2>
+
+<div class="card">
+    <h3>@SpringBootApplication</h3>
+    <div class="where">На главном классе <code>VikingDemoApplication</code>.</div>
+    <p>
+        Три аннотации в одной:
+    </p>
+    <ul>
+        <li><code>@Configuration</code> — класс с настройками Spring</li>
+        <li><code>@EnableAutoConfiguration</code> — включить «магию» Spring Boot (он сам настроит Web, JDBC, H2 и т.д. по тому, что в зависимостях)</li>
+        <li><code>@ComponentScan</code> — найти все классы с <code>@Component</code>, <code>@Service</code>, <code>@Repository</code>, <code>@RestController</code> в текущем пакете и подпакетах</li>
+    </ul>
+    <div class="quick"><b>Запомни:</b> без неё Spring Boot ничего не найдёт и приложение не поднимется.</div>
+</div>
+
+<div class="card">
+    <h3>@Service / @Repository / @Component / @RestController</h3>
+    <div class="where">
+        <code>@Service</code> — на <code>VikingService</code>, <code>VikingLambdaService</code>, <code>VikingFactory</code> через <code>@Component</code>.<br>
+        <code>@Repository</code> — на <code>VikingRepository</code>, <code>EquipmentItemRepository</code>, <code>VikingStorage</code>.<br>
+        <code>@Component</code> — на <code>VikingMapper</code>, <code>VikingListener</code>.
+    </div>
+    <p>
+        Все четыре говорят Spring: «создай мне экземпляр этого класса и держи его в IoC-контейнере как singleton». Различие — <b>смысловое</b>, не функциональное:
+    </p>
+    <pre>@Component     // самое общее — «это бин»
+@Service       // бизнес-логика
+@Repository    // работа с БД (+ автоконвертация SQL-исключений)
+@RestController // веб-контроллер с JSON-ответами</pre>
+    <p>
+        Spring при старте находит все классы с любой из этих аннотаций и создаёт по одному экземпляру каждого. Дальше может «инжектить» их в другие бины через конструктор.
+    </p>
+    <div class="quick"><b>Почему именно @Service у сервиса, а не @Component?</b> Технически работает одинаково, но <code>@Service</code> сообщает читателю «это бизнес-логика» — самодокументация кода.</div>
+</div>
+
+<div class="card">
+    <h3>@Autowired</h3>
+    <div class="where">У тебя в <code>VikingService</code> (на конструкторе), в <code>VikingListener</code>.</div>
+    <p>
+        Просит Spring «подставить сюда нужный бин». Применяется на:
+    </p>
+    <ul>
+        <li><b>Конструкторе</b> (рекомендовано) — Spring передаст бины при создании объекта.</li>
+        <li>Поле — Spring впрыснет напрямую (плохая практика).</li>
+        <li>Сеттере — Spring вызовет сеттер после создания.</li>
+    </ul>
+    <pre>@Service
+public class VikingService {
+    private final VikingFactory vikingFactory;
+    private final VikingStorage vikingStorage;
+
+    @Autowired   // ← можно вообще не писать, если конструктор один
+    public VikingService(VikingFactory f, VikingStorage s) {
+        this.vikingFactory = f;
+        this.vikingStorage = s;
+    }
+}</pre>
+    <div class="quick"><b>В новых версиях Spring</b> <code>@Autowired</code> на конструкторе можно не писать — если у класса единственный конструктор, Spring сам впрыснёт всё что нужно.</div>
+</div>
+
+<!-- =========================================== -->
+<h2>3. Транзакции</h2>
+
+<div class="card">
+    <h3>@Transactional</h3>
+    <div class="where">На методах <code>VikingStorage.save</code>, <code>update</code>, <code>deleteById</code>.</div>
+    <p>
+        Оборачивает метод в <b>транзакцию БД</b>. Принцип «всё или ничего»:
+    </p>
+    <ul>
+        <li>Если метод выполнился до конца без исключений — все SQL-команды коммитятся.</li>
+        <li>Если в середине вылетело RuntimeException — все SQL-команды откатываются.</li>
+    </ul>
+    <pre>@Transactional
+public Viking save(Viking viking) {
+    Integer id = vikingRepository.save(...);        // INSERT в vikings
+    for (item : equipment) {
+        equipmentItemRepository.save(...);          // INSERT в equipment_items
+    }
+    // Если упало посередине — оба INSERT откатятся, БД останется чистой.
+}</pre>
+    <div class="warn"><b>Тонкость:</b> по умолчанию транзакция откатывается только при RuntimeException. На checked-исключения — нет, если не указать <code>rollbackFor</code>.</div>
+    <div class="quick"><b>Зачем тут:</b> без транзакции при ошибке записи equipment у нас бы остался викинг без снаряжения — несогласованное состояние БД.</div>
+</div>
+
+<!-- =========================================== -->
+<h2>4. Swagger / OpenAPI (только документация)</h2>
+
+<p style="color: #86868b; font-size: 14px; margin-bottom: 16px;">
+    Эти аннотации <b>не влияют на работу</b> — они только заполняют веб-страницу Swagger UI на <code>/swagger-ui.html</code>.
+    Если их убрать, эндпоинты будут работать так же, но без описаний.
+</p>
+
+<div class="card">
+    <h3>@Tag(name = "...", description = "...")</h3>
+    <div class="where">На классе контроллера.</div>
+    <p>Группирует эндпоинты в Swagger UI под общим заголовком. У нас все методы попадают в группу «Vikings».</p>
+</div>
+
+<div class="card">
+    <h3>@Operation(summary = "...", operationId = "...")</h3>
+    <div class="where">На каждом методе контроллера.</div>
+    <p>Краткое описание эндпоинта. <code>summary</code> — текст для заголовка, <code>operationId</code> — уникальный ID операции в OpenAPI-спецификации.</p>
+</div>
+
+<div class="card">
+    <h3>@ApiResponses({ @ApiResponse(responseCode = "...", description = "...") })</h3>
+    <div class="where">На методах контроллера, описывает возможные коды ответа.</div>
+    <pre>@ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Викинг обновлён"),
+    @ApiResponse(responseCode = "404", description = "Викинг не найден")
+})</pre>
+    <p>Это <b>не валидация</b>! Просто описание для документации. Реальный код ответа задаёт сам метод через <code>ResponseEntity</code> или исключения.</p>
+</div>
+
+<div class="card">
+    <h3>@Schema(description = "...", example = "...")</h3>
+    <div class="where">На полях <code>Viking</code>, на самом record-е.</div>
+    <p>Описывает поле модели в Swagger: что это, какой пример значения, какого типа.</p>
+    <pre>public record Viking(
+    @Schema(description = "Имя викинга", example = "Bjorn")
+    String name,
+    ...
+)</pre>
+</div>
+
+<div class="card">
+    <h3>@ArraySchema(...)</h3>
+    <div class="where">На поле <code>equipment</code> в <code>Viking</code>.</div>
+    <p>То же что <code>@Schema</code>, но для коллекций — описывает массив целиком и тип элементов.</p>
+</div>
+
+<!-- =========================================== -->
+<h2>5. Стандартный Java (не Spring)</h2>
+
+<div class="card">
+    <h3>@Override</h3>
+    <div class="where">В <code>VikingMapper</code>, в record-ах при переопределении методов (если бы были).</div>
+    <p>
+        Проверка для компилятора: «этот метод должен <b>точно</b> перекрывать метод родителя/интерфейса». Если опечатка в имени или сигнатуре — компилятор выдаст ошибку.
+    </p>
+    <pre>@Override
+public String getModifierName() { return "Снежные ягоды"; }
+
+// если опечатаешься: getModifierNamE() — будет ошибка компиляции,
+// потому что нет такого метода в родителе</pre>
+    <div class="quick"><b>На рантайм не влияет.</b> Это страховка от опечаток. Желательно ставить везде, где метод что-то перекрывает.</div>
+</div>
+
+<!-- =========================================== -->
+<h2>Памятка «куда смотреть в защите»</h2>
+
+<div class="card">
+    <p>Если препод тыкает в любую <code>@...</code> — спрашивай себя:</p>
+    <ol>
+        <li><b>Из какого она пакета?</b> <code>org.springframework.*</code> — Spring, <code>io.swagger.*</code> — только документация, <code>java.lang.*</code> — стандарт.</li>
+        <li><b>На чём стоит?</b> На классе → создаёт бин или метаданные класса. На методе → влияет на HTTP-маппинг / транзакцию. На параметре → говорит откуда брать значение.</li>
+        <li><b>Что произойдёт, если убрать?</b> Это лучший способ понять смысл аннотации.</li>
+    </ol>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Обновление GUI после REST — наглядно по шагам</title>
+<style>
+    :root {
+        --bg: #0f0f13;
+        --surface: #17171f;
+        --border: #2a2a3a;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --code-bg: #0d0d14;
+        --accent: #818cf8;
+        --green: #34d399;
+        --gold: #fbbf24;
+        --red: #f87171;
+        --post: #34d399;
+        --delete: #f87171;
+        --put: #fbbf24;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 15px;
+        line-height: 1.6;
+        padding: 30px 20px 60px;
+    }
+    .wrap { max-width: 1000px; margin: 0 auto; }
+
+    h1 {
+        font-size: 26px;
+        margin-bottom: 8px;
+        background: linear-gradient(135deg, var(--accent), #c084fc);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    .lead {
+        color: var(--muted);
+        margin-bottom: 36px;
+    }
+
+    h2 {
+        font-size: 22px;
+        margin-top: 48px;
+        padding: 12px 20px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    h2.post   { background: rgba(52, 211, 153, 0.12); border-left: 4px solid var(--post); }
+    h2.delete { background: rgba(248, 113, 113, 0.12); border-left: 4px solid var(--delete); }
+    h2.put    { background: rgba(251, 191, 36, 0.12); border-left: 4px solid var(--put); }
+
+    .method {
+        font-family: "SF Mono", Menlo, monospace;
+        font-weight: 700;
+        font-size: 14px;
+        padding: 4px 10px;
+        border-radius: 4px;
+    }
+    .method.post   { background: rgba(52, 211, 153, 0.2); color: var(--post); }
+    .method.delete { background: rgba(248, 113, 113, 0.2); color: var(--delete); }
+    .method.put    { background: rgba(251, 191, 36, 0.2); color: var(--put); }
+
+    .step {
+        margin: 28px 0;
+    }
+    .step-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 10px;
+    }
+    .step-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px; height: 32px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: #0f0f13;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+    .step-title {
+        font-size: 17px;
+        font-weight: 600;
+    }
+    .step-file {
+        font-family: "SF Mono", Menlo, monospace;
+        font-size: 12px;
+        color: var(--muted);
+        margin-left: auto;
+    }
+    .step-explain {
+        color: var(--muted);
+        margin-bottom: 10px;
+        padding-left: 44px;
+    }
+
+    pre {
+        background: var(--code-bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 16px 20px;
+        overflow-x: auto;
+        font-family: "SF Mono", Menlo, monospace;
+        font-size: 13.5px;
+        line-height: 1.55;
+        margin-left: 44px;
+    }
+    .k  { color: #c084fc; }       /* keyword */
+    .t  { color: #67e8f9; }       /* type */
+    .s  { color: #86efac; }       /* string */
+    .n  { color: #fb923c; }       /* number */
+    .c  { color: #64748b; font-style: italic; }  /* comment */
+    .a  { color: var(--gold); }   /* annotation */
+    .v  { color: #e2e8f0; }       /* variable/text */
+    .hl { background: rgba(251, 191, 36, 0.18); display: inline-block; width: 100%; padding: 1px 6px; margin: 0 -6px; border-radius: 3px; }
+
+    .arrow {
+        color: var(--accent);
+        text-align: center;
+        font-size: 20px;
+        margin: 6px 0;
+    }
+
+    .final {
+        background: rgba(52, 211, 153, 0.1);
+        border: 1px solid var(--green);
+        border-radius: 8px;
+        padding: 14px 18px;
+        margin: 16px 0 28px 44px;
+        color: var(--green);
+        font-size: 14px;
+    }
+
+    .note {
+        background: rgba(129, 140, 248, 0.1);
+        border-left: 3px solid var(--accent);
+        padding: 12px 16px;
+        border-radius: 4px;
+        margin: 24px 0;
+        font-size: 14px;
+        color: #c7d2fe;
+    }
+    code {
+        font-family: "SF Mono", Menlo, monospace;
+        background: var(--code-bg);
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.92em;
+    }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Обновление GUI после REST — по шагам</h1>
+<p class="lead">
+    Три сценария: <b>POST</b> (создание), <b>DELETE</b> (удаление), <b>PUT</b> (обновление).
+    Каждый — пять шагов от прихода HTTP-запроса до перерисованной строки в таблице.
+    Подсвеченные жёлтым строки — ключевые для понимания.
+</p>
+
+<div class="note">
+    Структура одинаковая для всех трёх: <b>Controller → Listener → invokeLater → Frame → TableModel → JTable</b>.
+    Меняется только конкретный метод на каждом уровне.
+</div>
+
+<!-- ========================================================== POST -->
+<h2 class="post">
+    <span class="method post">POST</span>
+    Сценарий 1 — создание викинга
+</h2>
+
+<div class="step">
+    <div class="step-header">
+        <span class="step-num">1</span>
+        <span class="step-title">REST-запрос приходит в контроллер</span>
+        <span class="step-file">VikingController.java</span>
+    </div>
+    <p class="step-explain">
+        Spring видит POST на <code>/api/vikings</code>, метод <code>createViking</code>. Джексон превращает JSON
+        в объект <code>Viking</code> (без id — клиент его не присылает). Контроллер зовёт сервис.
+    </p>
+<pre><span class="a">@PostMapping</span>
+<span class="a">@Operation</span>(summary = <span class="s">"Добавить конкретного викинга"</span>, operationId = <span class="s">"createViking"</span>)
+<span class="k">public</span> <span class="t">ResponseEntity</span>&lt;<span class="t">Viking</span>&gt; <span class="v">createViking</span>(<span class="a">@RequestBody</span> <span class="t">Viking</span> viking) {
+    <span class="t">System</span>.out.println(<span class="s">"POST /api/vikings called with body: "</span> + viking);
+    <span class="hl"><span class="t">Viking</span> created = vikingService.create(viking);   <span class="c">// сохранили в БД, получили объект с id</span></span>
+    <span class="hl">vikingListener.onCreated(created);                <span class="c">// → шаг 2</span></span>
+    <span class="t">URI</span> location = <span class="t">URI</span>.create(<span class="s">"/api/vikings/"</span> + created.id());
+    <span class="k">return</span> <span class="t">ResponseEntity</span>.created(location).body(created);
+}</pre>
+</div>
+
+<div class="arrow">↓</div>
+
+<div class="step">
+    <div class="step-header">
+        <span class="step-num">2</span>
+        <span class="step-title">Listener оборачивает в invokeLater</span>
+        <span class="step-file">VikingListener.java</span>
+    </div>
+    <p class="step-explain">
+        Мы сейчас в потоке Tomcat. Swing требует EDT. <code>SwingUtilities.invokeLater</code> ставит лямбду
+        в очередь EDT — Swing сам её выполнит когда сможет.
+    </p>
+<pre><span class="c">/** REST-операция POST успешна — добавляем новую строку в таблицу. */</span>
+<span class="k">public</span> <span class="t">void</span> <span class="v">onCreated</span>(<span class="t">Viking</span> viking) {
+    <span class="k">if</span> (gui != <span class="k">null</span>) {
+        <span class="hl"><span class="t">SwingUtilities</span>.invokeLater(() -&gt; gui.addNewViking(viking));   <span class="c">// → шаг 3 (но в EDT)</span></span>
+    }
+}</pre>
+</div>
+
+<div class="arrow">↓</div>
+
+<div class="step">
+    <div class="step-header">
+        <span class="step-num">3</span>
+        <span class="step-title">Frame передаёт правку модели</span>
+        <span class="step-file">VikingDesktopFrame.java</span>
+    </div>
+    <p class="step-explain">Frame не лезет в данные сам, он просто пробрасывает викинга в tableModel.</p>
+<pre><span class="k">public</span> <span class="t">void</span> <span class="v">addNewViking</span>(<span class="t">Viking</span> viking) {
+    <span class="hl">tableModel.addViking(viking);   <span class="c">// → шаг 4</span></span>
+}</pre>
+</div>
+
+<div class="arrow">↓</div>
+
+<div class="step">
+    <div class="step-header">
+        <span class="step-num">4</span>
+        <span class="step-title">TableModel добавляет в список и оповещает JTable</span>
+        <span class="step-file">VikingTableModel.java</span>
+    </div>
+    <p class="step-explain">
+        Кладём викинга в конец списка и говорим JTable: «вставлена строка с индексом row».
+        JTable перерисует ТОЛЬКО её, не трогая остальные.
+    </p>
+<pre><span class="k">public</span> <span class="t">void</span> <span class="v">addViking</span>(<span class="t">Viking</span> viking) {
+    <span class="t">int</span> row = data.size();
+    data.add(viking);                       <span class="c">// добавили в список</span>
+    <span class="hl">fireTableRowsInserted(row, row);        <span class="c">// → шаг 5 (JTable получает уведомление)</span></span>
+}</pre>
+</div>
+
+<div class="arrow">↓</div>
+
+<div class="step">
+    <div class="step-header">
+        <span class="step-num">5</span>
+        <span class="step-title">JTable рисует новую строку</span>
+        <span class="step-file">встроенный механизм Swing</span>
+    </div>
+    <p class="step-explain">
+        Swing-таблица слушает события модели. <code>fireTableRowsInserted</code> вызывает
+        <code>tableChanged</code> у JTable, и она запрашивает значения только для новой строки
+        через <code>getValueAt(row, col)</code>. Никаких других строк не трогает.
+    </p>
+</div>
+
+<div class="final">
+    ✓ Викинг создан в БД, строка добавлена в окно, существующее выделение и прокрутка сохранены.
+</div>
+
+<!-- ========================================================== DELETE -->
+<h2 class="delete">
+    <span class="method delete">DELETE</span>
+    Сценарий 2 — удаление викинга
+</h2>
+
+<div class="step">
+    <div class="step-header">
+        <span class="step-num">1</span>
+        <span class="step-title">Контроллер удаляет из БД и зовёт листенер</span>
+        <span class="step-file">VikingController.java</span>
+    </div>
+    <p class="step-explain">
+        id берётся из URL через <code>@PathVariable</code>. Сервис удаляет викинга (equipment удалится каскадом
+        через FK). Дальше — обновить GUI по этому id.
+    </p>
+<pre><span class="a">@DeleteMapping</span>(<span class="s">"/{id}"</span>)
+<span class="a">@Operation</span>(summary = <span class="s">"Удалить викинга по id"</span>, operationId = <span class="s">"deleteViking"</span>)
+<span class="k">public</span> <span class="t">ResponseEntity</span>&lt;<span class="t">Void</span>&gt; <span class="v">deleteViking</span>(<span class="a">@PathVariable</span> <span class="t">int</span> id) {
+    <span class="t">System</span>.out.println(<span class="s">"DELETE /api/vikings/"</span> + id + <span class="s">" called"</span>);
+    <span class="hl">vikingService.deleteById(id);     <span class="c">// удалили из БД</span></span>
+    <span class="hl">vikingListener.onDeleted(id);     <span class="c">// → шаг 2</span></span>
+    <span class="k">return</span> <span class="t">ResponseEntity</span>.noContent().build();
+}</pre>
+</div>
+
+<div class="arrow">↓</div>
+
+<div class="step">
+    <div class="step-header">
+        <span class="step-num">2</span>
+        <span class="step-title">Listener в EDT</span>
+        <span class="step-file">VikingListener.java</span>
+    </div>
+<pre><span class="c">/** REST-операция DELETE успешна — удаляем конкретную строку по id. */</span>
+<span class="k">public</span> <span class="t">void</span> <span class="v">onDeleted</span>(<span class="t">int</span> id) {
+    <span class="k">if</span> (gui != <span class="k">null</span>) {
+        <span class="hl"><span class="t">SwingUtilities</span>.invokeLater(() -&gt; gui.removeViking(id));</span>
+    }
+}</pre>
+</div>
+
+<div class="arrow">↓</div>
+
+<div class="step">
+    <div class="step-header">
+        <span class="step-num">3</span>
+        <span class="step-title">Frame пробрасывает в tableModel</span>
+        <span class="step-file">VikingDesktopFrame.java</span>
+    </div>
+<pre><span class="c">/** Удалить строку с викингом по id (точечное обновление таблицы). */</span>
+<span class="k">public</span> <span class="t">void</span> <span class="v">removeViking</span>(<span class="t">int</span> id) {
+    <span class="hl">tableModel.removeByVikingId(id);</span>
+}</pre>
+</div>
+
+<div class="arrow">↓</div>
+
+<div class="step">
+    <div class="step-header">
+        <span class="step-num">4</span>
+        <span class="step-title">TableModel ищет по id и удаляет одну строку</span>
+        <span class="step-file">VikingTableModel.java</span>
+    </div>
+    <p class="step-explain">
+        Бежим по списку, находим викинга с нужным id (у каждого Viking есть поле id, поле прячем от JTable
+        но используем внутри). Удаляем элемент и оповещаем таблицу.
+    </p>
+<pre><span class="c">/** Удаляет строку с викингом, у которого данный id. */</span>
+<span class="k">public</span> <span class="t">void</span> <span class="v">removeByVikingId</span>(<span class="t">int</span> id) {
+    <span class="k">for</span> (<span class="t">int</span> i = <span class="n">0</span>; i &lt; data.size(); i++) {
+        <span class="t">Viking</span> v = data.get(i);
+        <span class="k">if</span> (v.id() != <span class="k">null</span> &amp;&amp; v.id() == id) {
+            <span class="hl">data.remove(i);                  <span class="c">// убрали из списка</span></span>
+            <span class="hl">fireTableRowsDeleted(i, i);      <span class="c">// JTable: «удалена строка i»</span></span>
+            <span class="k">return</span>;
+        }
+    }
+}</pre>
+</div>
+
+<div class="arrow">↓</div>
+
+<div class="step">
+    <div class="step-header">
+        <span class="step-num">5</span>
+        <span class="step-title">JTable убирает строку</span>
+        <span class="step-file">встроенный механизм Swing</span>
+    </div>
+    <p class="step-explain">
+        JTable получает событие удаления и убирает конкретную строку. Все строки ниже сдвигаются вверх
+        автоматически — мы об этом не заботимся.
+    </p>
+</div>
+
+<div class="final">
+    ✓ Викинг удалён из БД, строка пропала из окна, остальные строки на местах.
+</div>
+
+<!-- ========================================================== PUT -->
+<h2 class="put">
+    <span class="method put">PUT</span>
+    Сценарий 3 — обновление викинга
+</h2>
+
+<div class="step">
+    <div class="step-header">
+        <span class="step-num">1</span>
+        <span class="step-title">Контроллер обновляет в БД и зовёт листенер</span>
+        <span class="step-file">VikingController.java</span>
+    </div>
+    <p class="step-explain">
+        Два источника: id из URL, тело викинга из JSON. Сервис делает SQL UPDATE и возвращает уже обновлённого викинга.
+        Если такого id в БД нет — кидаем 404 (тут листенер уже не дёргается).
+    </p>
+<pre><span class="a">@PutMapping</span>(<span class="s">"/{id}"</span>)
+<span class="a">@Operation</span>(summary = <span class="s">"Полностью перезаписать параметры викинга"</span>)
+<span class="k">public</span> <span class="t">Viking</span> <span class="v">updateViking</span>(<span class="a">@PathVariable</span> <span class="t">int</span> id, <span class="a">@RequestBody</span> <span class="t">Viking</span> viking) {
+    <span class="t">System</span>.out.println(<span class="s">"PUT /api/vikings/"</span> + id + <span class="s">" called with body: "</span> + viking);
+    <span class="k">try</span> {
+        <span class="hl"><span class="t">Viking</span> updated = vikingService.update(id, viking);   <span class="c">// обновили в БД</span></span>
+        <span class="hl">vikingListener.onUpdated(updated);                    <span class="c">// → шаг 2</span></span>
+        <span class="k">return</span> updated;
+    } <span class="k">catch</span> (<span class="t">NoSuchElementException</span> e) {
+        <span class="k">throw new</span> <span class="t">ResponseStatusException</span>(<span class="t">HttpStatus</span>.NOT_FOUND, e.getMessage());
+    }
+}</pre>
+</div>
+
+<div class="arrow">↓</div>
+
+<div class="step">
+    <div class="step-header">
+        <span class="step-num">2</span>
+        <span class="step-title">Listener в EDT</span>
+        <span class="step-file">VikingListener.java</span>
+    </div>
+<pre><span class="c">/** REST-операция PUT успешна — заменяем строку с этим id новыми данными. */</span>
+<span class="k">public</span> <span class="t">void</span> <span class="v">onUpdated</span>(<span class="t">Viking</span> viking) {
+    <span class="k">if</span> (gui != <span class="k">null</span>) {
+        <span class="hl"><span class="t">SwingUtilities</span>.invokeLater(() -&gt; gui.replaceViking(viking));</span>
+    }
+}</pre>
+</div>
+
+<div class="arrow">↓</div>
+
+<div class="step">
+    <div class="step-header">
+        <span class="step-num">3</span>
+        <span class="step-title">Frame пробрасывает в tableModel</span>
+        <span class="step-file">VikingDesktopFrame.java</span>
+    </div>
+<pre><span class="c">/** Заменить викинга в таблице (находим по id, подставляем новые значения). */</span>
+<span class="k">public</span> <span class="t">void</span> <span class="v">replaceViking</span>(<span class="t">Viking</span> viking) {
+    <span class="hl">tableModel.replaceViking(viking);</span>
+}</pre>
+</div>
+
+<div class="arrow">↓</div>
+
+<div class="step">
+    <div class="step-header">
+        <span class="step-num">4</span>
+        <span class="step-title">TableModel ищет по id и заменяет</span>
+        <span class="step-file">VikingTableModel.java</span>
+    </div>
+    <p class="step-explain">
+        Находим викинга с тем же id что у пришедшего, делаем <code>data.set(i, viking)</code> — кладём новый объект
+        на то же место. <code>fireTableRowsUpdated</code> заставит JTable перерисовать только эту строку.
+    </p>
+<pre><span class="c">/** Заменяет викинга в таблице (находит по id и подставляет новый объект). */</span>
+<span class="k">public</span> <span class="t">void</span> <span class="v">replaceViking</span>(<span class="t">Viking</span> viking) {
+    <span class="k">if</span> (viking.id() == <span class="k">null</span>) <span class="k">return</span>;
+    <span class="k">for</span> (<span class="t">int</span> i = <span class="n">0</span>; i &lt; data.size(); i++) {
+        <span class="t">Viking</span> v = data.get(i);
+        <span class="k">if</span> (v.id() != <span class="k">null</span> &amp;&amp; v.id().equals(viking.id())) {
+            <span class="hl">data.set(i, viking);              <span class="c">// заменили объект в списке</span></span>
+            <span class="hl">fireTableRowsUpdated(i, i);       <span class="c">// JTable: «обновлена строка i»</span></span>
+            <span class="k">return</span>;
+        }
+    }
+}</pre>
+</div>
+
+<div class="arrow">↓</div>
+
+<div class="step">
+    <div class="step-header">
+        <span class="step-num">5</span>
+        <span class="step-title">JTable перерисовывает одну строку</span>
+        <span class="step-file">встроенный механизм Swing</span>
+    </div>
+    <p class="step-explain">
+        Самое аккуратное обновление: индекс строки не меняется, прокрутка и выделение сохраняются.
+        Если эта строка была выделена — выделение останется на ней.
+    </p>
+</div>
+
+<div class="final">
+    ✓ Викинг обновлён в БД, строка показывает новые значения, состояние UI не сброшено.
+</div>
+
+<!-- ========================================================== Итог -->
+<div class="note" style="margin-top:48px">
+    <b>Если препод покажет на код и спросит «объясни этот метод»</b> — у тебя по каждому файлу есть
+    1–3 ключевых метода, их и нужно знать наизусть:
+    <ul style="padding-left:1.5rem; margin-top:8px">
+        <li><b>Controller:</b> три эндпоинта — POST, DELETE, PUT — каждый делает свою работу с БД через service, потом дёргает listener.</li>
+        <li><b>Listener:</b> три метода <code>onCreated/onDeleted/onUpdated</code> — каждый оборачивает действие в <code>SwingUtilities.invokeLater</code>.</li>
+        <li><b>Frame:</b> три обёртки <code>addNewViking/removeViking/replaceViking</code> — просто проброс в tableModel.</li>
+        <li><b>TableModel:</b> ключевая логика — поиск по id и оповещение JTable через <code>fireTableRowsXxx</code>.</li>
+    </ul>
+</div>
+
+</div>
+</body>
+</html>

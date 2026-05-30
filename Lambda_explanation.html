@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Разбор практикума на лямбда-функции</title>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        max-width: 1100px;
+        margin: 30px auto;
+        padding: 0 20px;
+        color: #1d1d1f;
+        line-height: 1.55;
+    }
+    h1 { font-size: 26px; margin-bottom: 6px; }
+    h2 {
+        font-size: 19px;
+        margin-top: 36px;
+        margin-bottom: 10px;
+        padding-bottom: 6px;
+        border-bottom: 2px solid #d2d2d7;
+    }
+    h3 {
+        font-size: 16px;
+        margin-top: 22px;
+        margin-bottom: 6px;
+        color: #424245;
+    }
+    .lead {
+        color: #515154;
+        font-size: 15px;
+        margin-bottom: 24px;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        font-size: 14px;
+    }
+    th, td {
+        text-align: left;
+        vertical-align: top;
+        padding: 8px 10px;
+        border-bottom: 1px solid #e5e5ea;
+    }
+    th {
+        background: #f5f5f7;
+        font-weight: 600;
+    }
+    td.line {
+        color: #86868b;
+        width: 50px;
+        text-align: right;
+        font-family: "SF Mono", Menlo, monospace;
+        white-space: nowrap;
+    }
+    td.code {
+        font-family: "SF Mono", Menlo, monospace;
+        font-size: 13px;
+        white-space: pre;
+        color: #0b3d91;
+        width: 42%;
+    }
+    td.exp { color: #1d1d1f; }
+    .note {
+        background: #fffbe6;
+        border-left: 3px solid #f5c518;
+        padding: 10px 14px;
+        margin: 16px 0;
+        font-size: 14px;
+        border-radius: 4px;
+    }
+    .key {
+        background: #eef7ee;
+        border-left: 3px solid #34c759;
+        padding: 14px 18px;
+        margin: 20px 0;
+        font-size: 14px;
+        border-radius: 4px;
+    }
+    .diff {
+        background: #fef2f2;
+        border-left: 3px solid #ef4444;
+        padding: 10px 14px;
+        margin: 12px 0;
+        font-size: 14px;
+        border-radius: 4px;
+    }
+    code {
+        font-family: "SF Mono", Menlo, monospace;
+        background: #f5f5f7;
+        padding: 1px 5px;
+        border-radius: 3px;
+        font-size: 0.92em;
+    }
+    ul.files li { margin-bottom: 4px; }
+    .badge {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-right: 6px;
+    }
+    .badge.new { background: #d1fae5; color: #065f46; }
+    .badge.mod { background: #fef3c7; color: #92400e; }
+</style>
+</head>
+<body>
+
+<h1>Практикум на лямбда-функции — построчный разбор</h1>
+<p class="lead">
+    Задание: создать сервис, весь функционал которого реализуется через лямбды.
+    Три блока: подсчёт выборки по условиям, выдача данных для отображения (рандом /
+    фильтр / сортировка), операции с массивом ID. Плюс отдельная Swing-форма для запуска
+    всего этого. За основу — проект Viking_rest_demo, оригинальный код препода трогали
+    минимально.
+</p>
+
+<h2>Что добавлено и изменено</h2>
+<ul class="files">
+    <li><span class="badge new">НОВЫЙ</span> <code>service/VikingLambdaService.java</code> — сервис, всё на лямбдах</li>
+    <li><span class="badge new">НОВЫЙ</span> <code>gui/VikingLambdaFrame.java</code> — Swing-форма с тремя секциями</li>
+    <li><span class="badge mod">ИЗМ</span> <code>gui/VikingDesktopFrame.java</code> — добавлена кнопка «Открыть лямбда-сервис»</li>
+    <li><span class="badge mod">ИЗМ</span> <code>VikingDemoApplication.java</code> — получает <code>VikingLambdaService</code> из контекста и пробрасывает в фрейм</li>
+</ul>
+
+<div class="note">
+    <b>Что такое лямбда:</b> анонимная функция, которую можно передать как значение.
+    В Java синтаксис <code>(параметры) -&gt; тело</code>. Например <code>v -&gt; v.age() &gt; 30</code> —
+    это функция, которая берёт викинга и возвращает <code>true/false</code>. Такие функции —
+    это объекты <code>Predicate&lt;Viking&gt;</code>, их можно сохранять в переменные, передавать
+    в методы, комбинировать.
+</div>
+
+<!-- ============================================================ -->
+<h2>1. <code>VikingLambdaService</code> — сердце практикума</h2>
+
+<h3>Поля и конструктор</h3>
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">30–42</td>
+        <td class="code">private final VikingService vikingService;
+private final VikingRepository vikingRepository;
+private final Random random = new Random();
+
+public VikingLambdaService(
+    VikingService vikingService,
+    VikingRepository vikingRepository
+) {
+    this.vikingService = vikingService;
+    this.vikingRepository = vikingRepository;
+}</td>
+        <td class="exp">
+            Через конструктор Spring впрыскивает существующие бины. <code>vikingService</code> используется чтобы достать список викингов из БД, <code>vikingRepository</code> — чтобы получить «сырые» VikingEntity и из них вытащить только id (для секции «массив ID»).
+        </td>
+    </tr>
+</table>
+
+<h3>Predicate-фабрики — условия выборки</h3>
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">48–50</td>
+        <td class="code">public static Predicate&lt;Viking&gt; ageGreaterThan(int age) {
+    return v -&gt; v.age() &gt; age;
+}</td>
+        <td class="exp">
+            <b>Фабрика предикатов.</b> Метод не отвечает «true/false» — он <b>возвращает функцию</b>, которая потом будет проверять викингов по условию «возраст больше N». Это и есть лямбда: <code>v -&gt; v.age() &gt; age</code>.
+            <br><br>
+            Метод <code>static</code>, потому что ему не нужно состояние объекта — он чистая фабрика.
+        </td>
+    </tr>
+    <tr>
+        <td class="line">56–58</td>
+        <td class="code">public static Predicate&lt;Viking&gt; ageBetween(int from, int to) {
+    return v -&gt; v.age() &gt;= from &amp;&amp; v.age() &lt;= to;
+}</td>
+        <td class="exp">«В диапазоне» — лямбда с двумя условиями через <code>&amp;&amp;</code>.</td>
+    </tr>
+    <tr>
+        <td class="line">60–63</td>
+        <td class="code">public static Predicate&lt;Viking&gt; ageOutsideRange(int from, int to) {
+    return ageBetween(from, to).negate();
+}</td>
+        <td class="exp">
+            <b>Вот тут самое наглядное.</b> «Вне диапазона» = «не в диапазоне». У <code>Predicate</code> есть встроенный метод <code>.negate()</code>, который возвращает <b>обратный</b> предикат. Не нужно писать новую лямбду — переиспользуем существующую и инвертируем.
+        </td>
+    </tr>
+    <tr>
+        <td class="line">65–70</td>
+        <td class="code">public static Predicate&lt;Viking&gt; beardAndHair(
+    BeardStyle beardStyle, HairColor hairColor
+) {
+    Predicate&lt;Viking&gt; byBeard = v -&gt; v.beardStyle() == beardStyle;
+    Predicate&lt;Viking&gt; byHair  = v -&gt; v.hairColor() == hairColor;
+    return byBeard.and(byHair);
+}</td>
+        <td class="exp">
+            Условие «И» через <code>.and()</code>. Два простых предиката собираются в один сложный. Это <b>главная фишка лямбд</b> — можно строить условия как из кирпичиков.
+        </td>
+    </tr>
+    <tr>
+        <td class="line">75–79</td>
+        <td class="code">public static Predicate&lt;Viking&gt; hasAxes(int axeCount) {
+    return v -&gt; v.equipment().stream()
+        .filter(item -&gt; "Axe".equals(item.name()))
+        .count() == axeCount;
+}</td>
+        <td class="exp">
+            «Ровно N топоров». Внутри предиката — ещё один Stream API: фильтруем equipment по имени и считаем. Лямбды можно вкладывать друг в друга.
+        </td>
+    </tr>
+    <tr>
+        <td class="line">81–83</td>
+        <td class="code">public static Predicate&lt;Viking&gt; hasOneOrTwoAxes() {
+    return hasAxes(1).or(hasAxes(2));
+}</td>
+        <td class="exp">
+            Условие «ИЛИ» через <code>.or()</code>. Соединяем «1 топор» и «2 топора» в один предикат.
+        </td>
+    </tr>
+    <tr>
+        <td class="line">85–88</td>
+        <td class="code">public static Predicate&lt;Viking&gt; hasLegendaryEquipment() {
+    return v -&gt; v.equipment().stream()
+        .anyMatch(item -&gt; "Legendary".equals(item.quality()));
+}</td>
+        <td class="exp">
+            <code>anyMatch</code> — «есть хотя бы один элемент, удовлетворяющий условию». Возвращает true сразу как находит. Удобнее <code>filter().count() &gt; 0</code>.
+        </td>
+    </tr>
+</table>
+
+<div class="note">
+    <b>Главное здесь:</b> предикаты — это <b>данные</b>, а не действия. Их можно складывать,
+    комбинировать (<code>.and</code>, <code>.or</code>, <code>.negate</code>), хранить в переменных,
+    передавать в другие методы. Это как функции в математике: <code>f.g(x) = g(f(x))</code>.
+</div>
+
+<h3>Подсчёт выборки</h3>
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">94–98</td>
+        <td class="code">public long count(Predicate&lt;Viking&gt; predicate) {
+    return vikingService.findAll().stream()
+        .filter(predicate)
+        .count();
+    }</td>
+        <td class="exp">
+            <b>Один универсальный метод</b> на все случаи подсчёта. Принимает предикат, считает сколько викингов ему соответствуют. Из формы вызывается с разными предикатами: <code>count(ageGreaterThan(30))</code>, <code>count(beardAndHair(...))</code>, и т.д.
+        </td>
+    </tr>
+</table>
+
+<h3>Выдача данных на экран</h3>
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">108–117</td>
+        <td class="code">public Optional&lt;Viking&gt; randomVikingTallerThan(int heightCm) {
+    List&lt;Viking&gt; candidates = vikingService.findAll().stream()
+        .filter(v -&gt; v.heightCm() &gt; heightCm)
+        .toList();
+
+    return candidates.isEmpty()
+        ? Optional.empty()
+        : Optional.of(candidates.get(random.nextInt(candidates.size())));
+}</td>
+        <td class="exp">
+            <b>Случайный викинг ростом выше N.</b>
+            <ol style="margin:6px 0 0 18px">
+                <li>Stream: отфильтровать всех ростом &gt; N.</li>
+                <li>Из отфильтрованного списка взять случайного.</li>
+                <li>Если список пустой — вернуть <code>Optional.empty()</code> вместо <code>null</code>.</li>
+            </ol>
+            <code>Optional</code> — это «контейнер, который либо содержит значение, либо пуст». Заставляет код наверху явно обработать случай «нет значения». Защита от NPE.
+        </td>
+    </tr>
+    <tr>
+        <td class="line">119–122</td>
+        <td class="code">public List&lt;Viking&gt; withLegendaryEquipment() {
+    return vikingService.findAll().stream()
+        .filter(hasLegendaryEquipment())
+        .toList();
+}</td>
+        <td class="exp">Все викинги с легендарным снаряжением. Просто применяем готовый предикат-фабрику.</td>
+    </tr>
+    <tr>
+        <td class="line">128–133</td>
+        <td class="code">public List&lt;Viking&gt; redHairSortedByAge() {
+    return vikingService.findAll().stream()
+        .filter(v -&gt; v.hairColor() == HairColor.Red)
+        .sorted(Comparator.comparingInt(Viking::age))
+        .toList();
+}</td>
+        <td class="exp">
+            <b>Рыжеволосые, отсортированные по возрасту.</b>
+            <ul style="margin:6px 0 0 18px">
+                <li><code>.filter(...)</code> — оставить только с рыжими волосами.</li>
+                <li><code>.sorted(...)</code> — отсортировать. <code>Comparator.comparingInt(Viking::age)</code> создаёт компаратор по полю age.</li>
+                <li><code>Viking::age</code> — <b>method reference</b>, сокращённая запись для <code>v -&gt; v.age()</code>.</li>
+            </ul>
+        </td>
+    </tr>
+</table>
+
+<div class="note">
+    <b>Про <code>HairColor.Red</code>:</b> в модели нет цвета бороды (есть только её <i>стиль</i>: SHORT, LONG, BRAIDED...). Поэтому «рыжебородых» интерпретировал как «с рыжими волосами». Если препод спросит «а почему не борода?» — ответ: модель не хранит цвет бороды, взял ближайшее по смыслу.
+</div>
+
+<h3>Операции с массивом ID</h3>
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">139–142</td>
+        <td class="code">public List&lt;Integer&gt; allIds() {
+    return vikingRepository.findAll().stream()
+        .map(VikingEntity::id)
+        .toList();
+}</td>
+        <td class="exp">
+            Получаем список <code>VikingEntity</code> из БД, через <code>.map(VikingEntity::id)</code> вытаскиваем только id. Получаем <code>List&lt;Integer&gt;</code> — это и есть «массив ID».
+        </td>
+    </tr>
+    <tr>
+        <td class="line">144–147</td>
+        <td class="code">public Optional&lt;Integer&gt; maxId() {
+    return allIds().stream()
+        .max(Comparator.naturalOrder());
+}</td>
+        <td class="exp">
+            <code>.max</code> возвращает <code>Optional</code> — потому что если список пустой, максимума нет. <code>Comparator.naturalOrder()</code> сравнивает по дефолту (для Integer — числовой порядок).
+        </td>
+    </tr>
+    <tr>
+        <td class="line">149–152</td>
+        <td class="code">public List&lt;Integer&gt; evenIds() {
+    return allIds().stream()
+        .filter(id -&gt; id % 2 == 0)
+        .toList();
+}</td>
+        <td class="exp">Чётные id через простой фильтр. Лямбда <code>id -&gt; id % 2 == 0</code> — проверка делимости на 2.</td>
+    </tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>2. <code>VikingLambdaFrame</code> — Swing-форма</h2>
+
+<p>
+    Окно с тремя секциями (по пунктам задания) и текстовой областью внизу для вывода
+    результатов. Большая часть кода — стандартный Swing (JFrame, JPanel, JButton, JComboBox,
+    JSpinner, JTextArea). Самое интересное — обработчики кнопок, где используются лямбды.
+</p>
+
+<h3>Структура окна</h3>
+<div class="key">
+    <b>Layout:</b>
+    <ul>
+        <li><b>NORTH</b> — заголовок «Лямбда-сервис»</li>
+        <li><b>CENTER</b> — три секции в <code>JScrollPane</code>:
+            <ol>
+                <li>Подсчёт выборки (count) — поля и кнопки для каждого условия</li>
+                <li>Вывод данных (info) — три кнопки</li>
+                <li>Операции с массивом ID — три кнопки</li>
+            </ol>
+        </li>
+        <li><b>SOUTH</b> — <code>JTextArea</code> для вывода результатов</li>
+    </ul>
+</div>
+
+<h3>Пример обработчика кнопки</h3>
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">~95</td>
+        <td class="code">JButton btnGt = new JButton("Возраст &gt; N");
+btnGt.addActionListener(e -&gt; runCount(
+    "ageGreaterThan(" + ageGt.getValue() + ")",
+    VikingLambdaService.ageGreaterThan((int) ageGt.getValue())
+));</td>
+        <td class="exp">
+            <b>Лямбда как обработчик события.</b>
+            <ul style="margin:6px 0 0 18px">
+                <li><code>e -&gt; ...</code> — лямбда, которая будет вызвана при клике на кнопку. Параметр <code>e</code> — событие клика (не используем).</li>
+                <li>Внутри собираем предикат через <code>VikingLambdaService.ageGreaterThan(N)</code> и передаём его в <code>runCount</code>, который вызывает <code>lambdaService.count(predicate)</code>.</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td class="line">~165</td>
+        <td class="code">btnRed.addActionListener(e -&gt; {
+    List&lt;Viking&gt; list = lambdaService.redHairSortedByAge();
+    log("Рыжеволосые по возрасту (" + list.size() + "):");
+    list.forEach(v -&gt; log("  - " + format(v)));
+});</td>
+        <td class="exp">
+            Здесь вторая лямбда внутри первой: <code>list.forEach(v -&gt; log(...))</code> — для каждого викинга вывести в текстовое поле его описание. <code>forEach</code> принимает <code>Consumer&lt;Viking&gt;</code> — это тоже функциональный интерфейс, у нас лямбда вместо него.
+        </td>
+    </tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>3. <code>VikingDesktopFrame</code> — добавлена кнопка</h2>
+
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">~40</td>
+        <td class="code">JButton lambdaButton = new JButton("Открыть лямбда-сервис");
+lambdaButton.addActionListener(event -&gt; openLambdaFrame());</td>
+        <td class="exp">Кнопка под главным окном, открывающая отдельное окно лямбда-сервиса.</td>
+    </tr>
+    <tr>
+        <td class="line">~70</td>
+        <td class="code">private VikingLambdaFrame lambdaFrame;
+
+private void openLambdaFrame() {
+    if (lambdaFrame == null) {
+        lambdaFrame = new VikingLambdaFrame(lambdaService);
+    }
+    lambdaFrame.setVisible(true);
+    lambdaFrame.toFront();
+}</td>
+        <td class="exp">
+            Ленивая инициализация — окно создаётся при первом клике, потом просто переоткрывается. Если бы создавали в конструкторе — тащило бы за собой инициализацию даже когда лямбды не нужны.
+        </td>
+    </tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>4. <code>VikingDemoApplication</code> — проброс сервиса</h2>
+
+<table>
+    <tr><th class="line">№</th><th>Код</th><th>Что делает</th></tr>
+    <tr>
+        <td class="line">~22</td>
+        <td class="code">VikingLambdaService lambdaService =
+    context.getBean(VikingLambdaService.class);
+
+SwingUtilities.invokeLater(() -&gt; {
+    VikingDesktopFrame frame = new VikingDesktopFrame(vikingService, lambdaService);
+    ...
+});</td>
+        <td class="exp">
+            Достаём созданный Spring-ом бин <code>VikingLambdaService</code> из контекста и передаём в конструктор <code>VikingDesktopFrame</code> — теперь у фрейма есть доступ к лямбда-сервису, может его передавать в <code>VikingLambdaFrame</code>.
+        </td>
+    </tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>Возможные вопросы препода</h2>
+
+<div class="key">
+    <h3 style="margin-top:0">Про сами лямбды</h3>
+    <ul>
+        <li><b>Что такое лямбда?</b> Анонимная функция, которую можно передать как значение. В Java синтаксис <code>(параметры) -&gt; тело</code>. Под капотом — реализация функционального интерфейса (интерфейса с одним абстрактным методом).</li>
+        <li><b>Что такое функциональный интерфейс?</b> Интерфейс ровно с одним абстрактным методом — <code>Predicate&lt;T&gt;</code>, <code>Function&lt;T,R&gt;</code>, <code>Consumer&lt;T&gt;</code>, <code>Comparator&lt;T&gt;</code> и т.д. Лямбда «реализует» этот единственный метод.</li>
+        <li><b>Что такое method reference (<code>Viking::age</code>)?</b> Сокращённая запись для лямбды <code>v -&gt; v.age()</code>. Когда лямбда просто вызывает метод без преобразований — пишем method reference, короче и читабельнее.</li>
+        <li><b>Зачем <code>static</code> у Predicate-фабрик?</b> Им не нужно состояние объекта, они чистые функции. Static подчёркивает это и позволяет вызывать без создания экземпляра сервиса.</li>
+    </ul>
+</div>
+
+<div class="key">
+    <h3 style="margin-top:0">Про Stream API</h3>
+    <ul>
+        <li><b>Что такое Stream?</b> «Поток» элементов, по которому можно применить цепочку операций (filter, map, sorted, count, max...). Stream <b>ленивый</b> — операции выполняются только когда вызываешь терминальную операцию (toList, count, max).</li>
+        <li><b>Чем <code>filter</code> отличается от <code>map</code>?</b> filter — оставить элементы по условию, тип не меняется. map — преобразовать каждый элемент в другой (тип может меняться).</li>
+        <li><b>Что такое <code>toList()</code>?</b> Терминальная операция — собирает поток в обычный <code>List</code>. До неё Stream — просто описание «что делать», вычислений нет.</li>
+    </ul>
+</div>
+
+<div class="key">
+    <h3 style="margin-top:0">Про Optional</h3>
+    <ul>
+        <li><b>Зачем <code>Optional</code>, а не просто null?</b> Заставляет вызывающий код явно обработать случай «значение отсутствует». Защита от NullPointerException. Например, <code>maxId()</code> возвращает <code>Optional&lt;Integer&gt;</code> — клиент обязан проверить через <code>.isPresent()</code> или использовать <code>.orElse()</code>.</li>
+    </ul>
+</div>
+
+<div class="key">
+    <h3 style="margin-top:0">Архитектурные</h3>
+    <ul>
+        <li><b>Почему лямбда-сервис отдельный, а не в <code>VikingService</code>?</b> Чтобы не смешивать ответственности: <code>VikingService</code> — это базовые CRUD-операции, а <code>VikingLambdaService</code> — это аналитика и фильтрации над уже полученными данными. Если в проде станет много фильтраций — будет понятно, где их искать.</li>
+        <li><b>Зачем отдельный <code>VikingLambdaFrame</code>?</b> Не загромождать главное окно. Лямбда-сервис открывается отдельной формой по запросу, главное окно остаётся для базового CRUD.</li>
+    </ul>
+</div>
+
+</body>
+</html>

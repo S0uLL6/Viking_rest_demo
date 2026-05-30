@@ -9,6 +9,7 @@ create table if not exists vikings (
     height_cm int not null,
     hair_color varchar(50) not null,
     beard_style varchar(50) not null,
+    beard_color varchar(50),
     description text
 );
 

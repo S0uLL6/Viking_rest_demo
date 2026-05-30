@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Random;
 import net.datafaker.Faker;
 import org.springframework.stereotype.Component;
+import ru.mephi.vikingdemo.model.BeardColor;
 import ru.mephi.vikingdemo.model.BeardStyle;
 import ru.mephi.vikingdemo.model.EquipmentItem;
 import ru.mephi.vikingdemo.model.HairColor;
@@ -24,6 +25,7 @@ public class VikingFactory {
                 160 + random.nextInt(41),
                 HairColor.values()[random.nextInt(HairColor.values().length)],
                 BeardStyle.values()[random.nextInt(BeardStyle.values().length)],
+                BeardColor.values()[random.nextInt(BeardColor.values().length)],
                 createRandomEquipment()
         );
     }
